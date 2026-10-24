@@ -2,6 +2,7 @@
 import { FileText, LoaderCircle, RefreshCw } from "lucide-react";
 import type { Media } from "@mylife/shared";
 import { api, sizeLabel } from "@/lib/api";
+import { mediaUrl } from "@/lib/urls";
 export function MediaView({
   media,
   onRetry,
@@ -9,7 +10,7 @@ export function MediaView({
   media: Media;
   onRetry?: () => void;
 }) {
-  const url = media.url?.replace(/^https?:\/\/[^/]+/, "");
+  const url = mediaUrl(media.url);
   if (media.processingStatus !== "ready")
     return (
       <div className="media-processing">
@@ -42,16 +43,34 @@ export function MediaView({
   if (media.mimeType?.startsWith("image/"))
     return (
       <a href={url} target="_blank" rel="noreferrer">
-        <img src={url} alt={media.alt || "成长记录照片"} loading="lazy" />
+        <img
+          src={url}
+          crossOrigin="use-credentials"
+          alt={media.alt || "成长记录照片"}
+          loading="lazy"
+        />
       </a>
     );
   if (media.mimeType?.startsWith("video/"))
-    return <video src={url} controls playsInline preload="metadata" />;
+    return (
+      <video
+        src={url}
+        crossOrigin="use-credentials"
+        controls
+        playsInline
+        preload="metadata"
+      />
+    );
   if (media.mimeType?.startsWith("audio/"))
     return (
       <div className="audio-player">
         <span>留住当时的声音</span>
-        <audio src={url} controls preload="metadata" />
+        <audio
+          src={url}
+          crossOrigin="use-credentials"
+          controls
+          preload="metadata"
+        />
       </div>
     );
   return (

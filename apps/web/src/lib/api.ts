@@ -10,9 +10,9 @@ export async function api<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const response = await fetch(`/api${path}`, {
+  const response = await fetch(apiUrl(path), {
     ...options,
-    credentials: "same-origin",
+    credentials: "include",
     cache: "no-store",
     headers: {
       ...(options.body && !(options.body instanceof FormData)
@@ -36,3 +36,4 @@ export function sizeLabel(size: number) {
     ? `${Math.max(1, Math.round(size / 1024))} KB`
     : `${(size / 1024 / 1024).toFixed(1)} MB`;
 }
+import { apiUrl } from "./urls";

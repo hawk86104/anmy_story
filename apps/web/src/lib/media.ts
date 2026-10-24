@@ -1,5 +1,6 @@
 import type { Media } from "@mylife/shared";
 import { ApiError } from "./api";
+import { apiUrl } from "./urls";
 export async function compressImage(
   file: File,
   document: boolean,
@@ -41,7 +42,7 @@ export function uploadMedia(
 ): Promise<Media> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", "/api/media");
+    xhr.open("POST", apiUrl("/media"));
     xhr.withCredentials = true;
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable)

@@ -39,6 +39,7 @@ import type {
 import { ENTRY_TYPES, displayDate } from "@mylife/shared";
 import { useSession } from "./session";
 import { api, sizeLabel, ApiError } from "@/lib/api";
+import { mediaUrl } from "@/lib/urls";
 import { compressImage, uploadMedia } from "@/lib/media";
 import {
   draftKey,
@@ -650,10 +651,8 @@ export function EntryEditor({
                       {item.preview ||
                       item.media?.mimeType?.startsWith("image/") ? (
                         <img
-                          src={
-                            item.preview ||
-                            item.media?.url?.replace(/^https?:\/\/[^/]+/, "")
-                          }
+                          src={item.preview || mediaUrl(item.media?.url)}
+                          crossOrigin="use-credentials"
                           alt={`素材 ${i + 1}`}
                         />
                       ) : (

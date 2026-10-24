@@ -69,3 +69,5 @@ npm run build
 ## 继续完善
 
 开发顺序见 [ROADMAP](docs/ROADMAP.md)，权限和数据边界见 [架构说明](docs/ARCHITECTURE.md)，正式环境配置见 [运行与部署](docs/OPERATIONS.md)。
+
+本次指定的 `anmy.icegl.cn`（EO Pages）+ `story.icegl.cn`（Ubuntu 22.04 宝塔）部署步骤、SQLite 初始化、PM2 与 Nginx 模板见 [腾讯云部署清单](docs/DEPLOY_TENCENT.md)。

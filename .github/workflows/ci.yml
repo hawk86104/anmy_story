@@ -24,3 +24,20 @@ jobs:
         env:
           NODE_ENV: production
       - run: npm run build
+      - name: Build frontend for EdgeOne direct API deployment
+        run: npm run build --workspace @mylife/web
+        env:
+          NEXT_PUBLIC_API_ORIGIN: https://story.icegl.cn
+          NEXT_PUBLIC_CMS_ADMIN_URL: https://story.icegl.cn/admin
+          CMS_INTERNAL_URL: https://story.icegl.cn
+      - name: Check cross-origin API deployment contract
+        shell: bash
+        run: |
+          WEB_ORIGIN=https://anmy.icegl.cn CMS_ORIGIN=https://story.icegl.cn npm run start --workspace @mylife/cms > /tmp/mylife-cms.log 2>&1 &
+          MYLIFE_CMS_PID=$!
+          trap 'kill "$MYLIFE_CMS_PID" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl -fsS http://127.0.0.1:3001/api/health > /dev/null; then break; fi
+            sleep 1
+          done
+          node scripts/verify-deployment.mjs --api-origin http://127.0.0.1:3001 --web-origin https://anmy.icegl.cn
