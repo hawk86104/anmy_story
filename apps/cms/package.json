@@ -1,0 +1,38 @@
+{
+  "name": "@mylife/cms",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --port 3001 --webpack",
+    "build": "payload generate:importmap && next build --webpack",
+    "start": "next start --port 3001",
+    "typecheck": "tsc --noEmit",
+    "generate:types": "payload generate:types",
+    "seed": "tsx src/scripts/seed.ts",
+    "test": "tsx --test --test-force-exit src/tests/*.test.ts",
+    "db:migrate": "payload migrate",
+    "db:migrate:create": "payload migrate:create",
+    "media:worker": "tsx src/scripts/media-worker.ts"
+  },
+  "dependencies": {
+    "@mylife/shared": "0.1.0",
+    "@payloadcms/db-sqlite": "3.92.0",
+    "@payloadcms/next": "3.92.0",
+    "@payloadcms/ui": "3.92.0",
+    "payload": "3.92.0",
+    "next": "16.4.3",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "graphql": "^16.11.0",
+    "sharp": "^0.35.5",
+    "dotenv": "^16.6.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "tsx": "^4.23.0",
+    "@types/node": "^24.10.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0"
+  }
+}
