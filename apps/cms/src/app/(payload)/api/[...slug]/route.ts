@@ -14,6 +14,7 @@ function protect<T extends (...args: never[]) => Promise<Response>>(
     const response = await handler(...args);
     response.headers.set("Cache-Control", "private, no-store");
     response.headers.set("X-Content-Type-Options", "nosniff");
+    response.headers.append("Vary", "Origin");
     return response;
   }) as T;
 }

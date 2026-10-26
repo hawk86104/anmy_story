@@ -2,7 +2,7 @@
 
 ## 应用分工
 
-`apps/web` 负责所有访客及孩子使用的界面，默认端口 3000。`apps/cms` 默认端口 3001，提供 Payload 的家长后台、REST API、认证与服务端规则。两者单独构建、单独运行；前台通过同源 `/api` 代理后端，避免在浏览器保存访问令牌。
+`apps/web` 负责所有访客及孩子使用的界面，默认端口 3000。`apps/cms` 默认端口 3001，提供 Payload 的家长后台、REST API、认证与服务端规则。两者单独构建、单独运行。本地默认通过同源 `/api` 代理后端；设置 `NEXT_PUBLIC_API_ORIGIN` 的独立部署模式中，浏览器带 HttpOnly Cookie 直连后台。两种模式都不在 LocalStorage 保存访问令牌。
 
 `packages/shared` 只包含类型、记录方式、日期显示等公开协议，不能包含数据库配置、私钥或 Payload Local API。
 

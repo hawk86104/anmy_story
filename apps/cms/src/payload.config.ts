@@ -17,7 +17,7 @@ if (!process.env.PAYLOAD_SECRET || process.env.PAYLOAD_SECRET.length < 32)
 export default buildConfig({
   secret: process.env.PAYLOAD_SECRET,
   cookiePrefix: "mylife",
-  serverURL: webOrigin,
+  serverURL: cmsOrigin,
   cors: [webOrigin, cmsOrigin],
   csrf: [webOrigin, cmsOrigin],
   admin: {

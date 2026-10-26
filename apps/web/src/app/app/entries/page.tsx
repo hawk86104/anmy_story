@@ -14,6 +14,7 @@ import {
 import { ENTRY_TYPES, entryTitle, displayDate } from "@mylife/shared";
 import type { Entry } from "@mylife/shared";
 import { api } from "@/lib/api";
+import { mediaUrl } from "@/lib/urls";
 export default function Timeline() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [type, setType] = useState("all");
@@ -202,7 +203,8 @@ export default function Timeline() {
                       {photo && typeof photo !== "number" && (
                         <img
                           className="timeline-thumbnail"
-                          src={photo.url.replace(/^https?:\/\/[^/]+/, "")}
+                          src={mediaUrl(photo.url)}
+                          crossOrigin="use-credentials"
                           alt={photo.alt || "记录照片"}
                           loading="lazy"
                         />
