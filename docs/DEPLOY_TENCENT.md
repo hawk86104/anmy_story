@@ -148,6 +148,8 @@ curl -f https://story.icegl.cn/api/health
 
 根目录只设置工作路径；`npm ci --prefix ../..` 从 `apps/web` 使用仓库根目录的 npm workspaces、锁文件和 `packages/shared`。完整命令配置已放在 `apps/web/edgeone.json`。不要把输出目录设成 `out`，当前前台含服务端渲染；也不要在 EO 调用仓库根的 `npm run build`，该命令会同时构建后台。
 
+`npm run build` 的 `prebuild` 会自动准备 `apps/web/node_modules` 目录。npm workspaces 的依赖实际安装在仓库根目录，而 EO 的 Next.js 适配器在复制已追踪的依赖时还会扫描应用目录；补建该目录解决 `onBuild hook: ENOENT ... scandir .../apps/web/node_modules`。此步骤已随源码提供，控制台构建命令继续使用 `npm run build`。
+
 如果控制台安装命令输入框左侧已经固定显示 `npm`，只在后面的输入框填写 `ci --prefix ../..`；如果输入框要求完整命令，则填写 `npm ci --prefix ../..`。构建日志最终应显示 `[builder] InstallCommand: npm ci --prefix ../..`。不要填写 `cd ../.. && npm ci`，否则补上包管理器前缀后会成为 `npm cd ...`，报 `Unknown command: "cd"`。
 
 构建日志里的实际 Node 版本应为 `v24.22.1`。如果仍显示 `v22.21.1`，先确认部署提交已包含本部署 PR，根目录为 `apps/web`，并清除控制台中与仓库配置冲突的旧命令 / Node 设置，再基于最新提交重新部署。项目要求 Node `^22.23.4 || >=24.22.1`；不要通过忽略版本检查继续使用旧版。

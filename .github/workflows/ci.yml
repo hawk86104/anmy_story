@@ -26,8 +26,9 @@ jobs:
         env:
           NODE_ENV: production
       - run: npm run build
-      - name: Build frontend for EdgeOne direct API deployment
-        run: npm run build --workspace @mylife/web
+      - name: Package frontend with the EdgeOne builder
+        working-directory: apps/web
+        run: npm exec --yes --package=edgeone@1.6.46 -- edgeone makers build
         env:
           NEXT_PUBLIC_API_ORIGIN: https://story.icegl.cn
           NEXT_PUBLIC_CMS_ADMIN_URL: https://story.icegl.cn/admin
