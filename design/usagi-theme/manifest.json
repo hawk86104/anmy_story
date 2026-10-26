@@ -1,0 +1,353 @@
+{
+  "created": "2026-10-26",
+  "theme": "乌萨奇的阳光手账",
+  "note": "最终 PNG 来自 Pen 原生可编辑画布；全部为示例内容，阶段 B/C 页面属于规划。",
+  "pages": [
+    {
+      "id": "P01",
+      "title": "公开个人首页",
+      "device": "desktop",
+      "width": 1440,
+      "height": 1510,
+      "phase": "A/B",
+      "file": "pages/P01-desktop.svg",
+      "png": "exports/P01-desktop.png",
+      "penNodeId": "IeeDM"
+    },
+    {
+      "id": "P01",
+      "title": "公开个人首页",
+      "device": "mobile",
+      "width": 390,
+      "height": 1540,
+      "phase": "A/B",
+      "file": "pages/P01-mobile.svg",
+      "png": "exports/P01-mobile.png",
+      "penNodeId": "mMh1g"
+    },
+    {
+      "id": "P02",
+      "title": "公开成长时间轴",
+      "device": "desktop",
+      "width": 1440,
+      "height": 1310,
+      "phase": "B",
+      "file": "pages/P02-desktop.svg",
+      "png": "exports/P02-desktop.png",
+      "penNodeId": "crEmB"
+    },
+    {
+      "id": "P02",
+      "title": "公开成长时间轴",
+      "device": "mobile",
+      "width": 390,
+      "height": 1175,
+      "phase": "B",
+      "file": "pages/P02-mobile.svg",
+      "png": "exports/P02-mobile.png",
+      "penNodeId": "r7M3q"
+    },
+    {
+      "id": "P03",
+      "title": "作品展厅",
+      "device": "desktop",
+      "width": 1440,
+      "height": 1320,
+      "phase": "B",
+      "file": "pages/P03-desktop.svg",
+      "png": "exports/P03-desktop.png",
+      "penNodeId": "d7vEec"
+    },
+    {
+      "id": "P03",
+      "title": "作品展厅",
+      "device": "mobile",
+      "width": 390,
+      "height": 1240,
+      "phase": "B",
+      "file": "pages/P03-mobile.svg",
+      "png": "exports/P03-mobile.png",
+      "penNodeId": "DmGSO"
+    },
+    {
+      "id": "P04",
+      "title": "荣誉与小里程碑",
+      "device": "desktop",
+      "width": 1440,
+      "height": 1280,
+      "phase": "B",
+      "file": "pages/P04-desktop.svg",
+      "png": "exports/P04-desktop.png",
+      "penNodeId": "AeVQp"
+    },
+    {
+      "id": "P04",
+      "title": "荣誉与小里程碑",
+      "device": "mobile",
+      "width": 390,
+      "height": 1160,
+      "phase": "B",
+      "file": "pages/P04-mobile.svg",
+      "png": "exports/P04-mobile.png",
+      "penNodeId": "SWbqN"
+    },
+    {
+      "id": "P05",
+      "title": "成长项目列表",
+      "device": "desktop",
+      "width": 1440,
+      "height": 1240,
+      "phase": "B",
+      "file": "pages/P05-desktop.svg",
+      "png": "exports/P05-desktop.png",
+      "penNodeId": "ndrmC"
+    },
+    {
+      "id": "P05",
+      "title": "成长项目列表",
+      "device": "mobile",
+      "width": 390,
+      "height": 1250,
+      "phase": "B",
+      "file": "pages/P05-mobile.svg",
+      "png": "exports/P05-mobile.png",
+      "penNodeId": "WzRdb"
+    },
+    {
+      "id": "P06",
+      "title": "成长项目详情",
+      "device": "desktop",
+      "width": 1440,
+      "height": 1440,
+      "phase": "B",
+      "file": "pages/P06-desktop.svg",
+      "png": "exports/P06-desktop.png",
+      "penNodeId": "a2x1C"
+    },
+    {
+      "id": "P06",
+      "title": "成长项目详情",
+      "device": "mobile",
+      "width": 390,
+      "height": 1360,
+      "phase": "B",
+      "file": "pages/P06-mobile.svg",
+      "png": "exports/P06-mobile.png",
+      "penNodeId": "UbXeS"
+    },
+    {
+      "id": "P07",
+      "title": "公开记录与作品详情",
+      "device": "desktop",
+      "width": 1440,
+      "height": 1640,
+      "phase": "A/B",
+      "file": "pages/P07-desktop.svg",
+      "png": "exports/P07-desktop.png",
+      "penNodeId": "T7ij0"
+    },
+    {
+      "id": "P07",
+      "title": "公开记录与作品详情",
+      "device": "mobile",
+      "width": 390,
+      "height": 1390,
+      "phase": "A/B",
+      "file": "pages/P07-mobile.svg",
+      "png": "exports/P07-mobile.png",
+      "penNodeId": "aMuPC"
+    },
+    {
+      "id": "P08",
+      "title": "登录",
+      "device": "desktop",
+      "width": 1440,
+      "height": 1000,
+      "phase": "A",
+      "file": "pages/P08-desktop.svg",
+      "png": "exports/P08-desktop.png",
+      "penNodeId": "IqDm7"
+    },
+    {
+      "id": "P08",
+      "title": "登录",
+      "device": "mobile",
+      "width": 390,
+      "height": 920,
+      "phase": "A",
+      "file": "pages/P08-mobile.svg",
+      "png": "exports/P08-mobile.png",
+      "penNodeId": "VkwX5"
+    },
+    {
+      "id": "M01",
+      "title": "我的空间",
+      "device": "mobile",
+      "width": 390,
+      "height": 1210,
+      "phase": "A",
+      "file": "pages/M01-mobile.svg",
+      "png": "exports/M01-mobile.png",
+      "penNodeId": "bksR0"
+    },
+    {
+      "id": "M02",
+      "title": "记一件事",
+      "device": "mobile",
+      "width": 390,
+      "height": 1270,
+      "phase": "A",
+      "file": "pages/M02-mobile.svg",
+      "png": "exports/M02-mobile.png",
+      "penNodeId": "GijDk"
+    },
+    {
+      "id": "M03",
+      "title": "私人成长时间轴",
+      "device": "mobile",
+      "width": 390,
+      "height": 1190,
+      "phase": "A",
+      "file": "pages/M03-mobile.svg",
+      "png": "exports/M03-mobile.png",
+      "penNodeId": "CdNKV"
+    },
+    {
+      "id": "M04",
+      "title": "私人记录详情",
+      "device": "mobile",
+      "width": 390,
+      "height": 1300,
+      "phase": "A",
+      "file": "pages/M04-mobile.svg",
+      "png": "exports/M04-mobile.png",
+      "penNodeId": "bfvjZ"
+    },
+    {
+      "id": "M05",
+      "title": "个人资料与主页设置",
+      "device": "mobile",
+      "width": 390,
+      "height": 1160,
+      "phase": "B",
+      "file": "pages/M05-mobile.svg",
+      "png": "exports/M05-mobile.png",
+      "penNodeId": "BDzXJ"
+    },
+    {
+      "id": "M06",
+      "title": "记录编辑器交互状态",
+      "device": "mobile",
+      "width": 390,
+      "height": 1370,
+      "phase": "A",
+      "file": "pages/M06-mobile.svg",
+      "png": "exports/M06-mobile.png",
+      "penNodeId": "vQqYM"
+    },
+    {
+      "id": "M07",
+      "title": "空状态与保存反馈",
+      "device": "mobile",
+      "width": 390,
+      "height": 1390,
+      "phase": "A",
+      "file": "pages/M07-mobile.svg",
+      "png": "exports/M07-mobile.png",
+      "penNodeId": "Jr9rz"
+    },
+    {
+      "id": "A01",
+      "title": "家长后台概览",
+      "device": "mobile",
+      "width": 390,
+      "height": 1150,
+      "phase": "A",
+      "file": "pages/A01-mobile.svg",
+      "png": "exports/A01-mobile.png",
+      "penNodeId": "piDN8"
+    },
+    {
+      "id": "A02",
+      "title": "家庭记录管理",
+      "device": "mobile",
+      "width": 390,
+      "height": 1190,
+      "phase": "A",
+      "file": "pages/A02-mobile.svg",
+      "png": "exports/A02-mobile.png",
+      "penNodeId": "P8UJd"
+    },
+    {
+      "id": "A03",
+      "title": "记录编辑与版本历史",
+      "device": "mobile",
+      "width": 390,
+      "height": 1330,
+      "phase": "A",
+      "file": "pages/A03-mobile.svg",
+      "png": "exports/A03-mobile.png",
+      "penNodeId": "E1dQ9k"
+    },
+    {
+      "id": "A04",
+      "title": "家庭素材库",
+      "device": "mobile",
+      "width": 390,
+      "height": 1290,
+      "phase": "A/B",
+      "file": "pages/A04-mobile.svg",
+      "png": "exports/A04-mobile.png",
+      "penNodeId": "zfkJL"
+    },
+    {
+      "id": "A05",
+      "title": "家庭成员",
+      "device": "mobile",
+      "width": 390,
+      "height": 1110,
+      "phase": "A",
+      "file": "pages/A05-mobile.svg",
+      "png": "exports/A05-mobile.png",
+      "penNodeId": "P6tvYD"
+    },
+    {
+      "id": "A06",
+      "title": "主题与主页管理",
+      "device": "mobile",
+      "width": 390,
+      "height": 1320,
+      "phase": "B",
+      "file": "pages/A06-mobile.svg",
+      "png": "exports/A06-mobile.png",
+      "penNodeId": "r7Hu2"
+    },
+    {
+      "id": "A07",
+      "title": "AI与长期保存设置",
+      "device": "mobile",
+      "width": 390,
+      "height": 1330,
+      "phase": "C",
+      "file": "pages/A07-mobile.svg",
+      "png": "exports/A07-mobile.png",
+      "penNodeId": "PdO3u"
+    },
+    {
+      "id": "00",
+      "title": "品牌视觉规范",
+      "device": "board",
+      "width": 1440,
+      "height": 1720,
+      "phase": "A/B/C",
+      "file": "pages/00-board.svg",
+      "png": "exports/00-board.png",
+      "penNodeId": "bi8Au"
+    }
+  ],
+  "nativeDocument": "C:/Users/Administrator/.pencil/documents/4b655d5c-9e69-4e4b-8988-a43c9c6e0c8e/anmy_story.pen",
+  "visualValidation": {
+    "checkedLayers": 2397,
+    "layoutIssues": 0
+  }
+}

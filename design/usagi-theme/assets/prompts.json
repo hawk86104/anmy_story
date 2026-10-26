@@ -1,0 +1,26 @@
+{
+  "generator": "built-in image_gen",
+  "generatedOn": "2026-10-26",
+  "prompts": [
+    {
+      "key": "usagi-meadow-banner",
+      "transparent_background": false,
+      "prompt": "Use case: illustration-story. Asset type: wide hero banner artwork for MyLife, a Chinese child's personal growth journal website with a Chiikawa theme, Usagi as the dominant character. Create a polished 2.5:1 landscape illustration, ideally 2560x1024. A warm buttery cream meadow, pale blue sky, tiny daisies, soft sage grass, honey-yellow accents, very subtle paper grain. Right two-thirds: recognizably Usagi from Chiikawa, pale warm yellow small chubby body, very long upright ears with soft pink inner ears, tiny brown eyes, iconic mischievous cat-shaped small mouth, pink cheeks, holding a little blank yellow notebook and a pencil, sitting on a picnic blanket. Smaller Chiikawa and Hachiware beside Usagi at the far right; Usagi is largest and most visually important. Rounded hand-drawn dark brown outlines, flat clean kawaii Japanese stationery illustration, gentle watercolor fills. LEFT 45 percent must be airy nearly empty pale cream for editable website headline; only sparse tiny flowers near its bottom. A few soft clouds and small star doodles. Landscape follows a low horizon and no hard rectangular border. Do not put any text, letters, logos, watermark, UI, browser frame or mockup in the picture. This is the actual site illustration asset."
+    },
+    {
+      "key": "usagi-journal-sticker",
+      "transparent_background": true,
+      "prompt": "Use case: illustration-story. Asset type: transparent-background mascot sticker for MyLife growth journal website. A single clean cutout of Usagi from Chiikawa, full body, large very long upright rabbit-like ears with soft pale pink insides, tiny round dark brown eyes, iconic mischievous small cat-shaped mouth, pale butter-yellow chubby body, round pink cheeks, little cream-white tail. Usagi hugs a small closed honey-yellow notebook with a tiny white daisy mark, one arm lifted in an excited greeting. Faithful cute character silhouette and facial proportions, simple smooth dark cocoa brown hand-drawn contour, flat pastel fills, polished kawaii stationery sticker. No white sticker outline outside the contour. A couple of tiny golden sparkles can accompany the character close to its body. Centered, generous transparent padding especially above ear tips. Actual transparent alpha background, no text, no watermark, no checkerboard, no colored background, no scene, no UI. Square composition 1024x1024."
+    },
+    {
+      "key": "little-art-adventure",
+      "transparent_background": false,
+      "prompt": "Use case: illustration-story. Asset type: landscape content-cover sample image for a child's personal growth journal and artwork gallery. A tactile handmade watercolor scrapbook artwork on ivory paper: soft sage-green rolling hills, a small honey-yellow house, blue-gray mountains, a winding pale cream path, a handful of tiny daisies, a little sun in a butter-yellow sky. Include a few cut-paper shapes and faint colored pencil edges so it feels like a treasured child's creative artwork, tasteful and beautifully composed, no human faces, no text, no letters, no border, no watermark, no UI. Warm off-white #FFF9ED, honey yellow #F4C84A, sage #A9BD9A, pale sky #DCEAF0, cocoa #594437. Landscape composition 1536x1024, good crop tolerance for cards."
+    }
+  ],
+  "vectorLogo": {
+    "generator": "pen.dev Generate(svg)",
+    "nodeId": "s6fNj",
+    "prompt": "Create ONE compact vector brand mark for MyLife, a child's growth journal with a Chiikawa Usagi theme: a tiny closed yellow journal whose top corners turn into two long rounded Usagi-like ears. A subtle cute small face, two tiny brown dots and a small playful mouth. Rounded silhouette, cocoa brown #544235 contour, pale butter #FFF0BF body, honey yellow #F6CE55 cover, extremely simple flat kawaii stationery logo, balanced and readable at 32px. No words, no lettering, no background, no additional objects, no gradients or shadows. Single centered symbol filling 90 percent of the square canvas."
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "document": "C:/Users/Administrator/.pencil/documents/4b655d5c-9e69-4e4b-8988-a43c9c6e0c8e/anmy_story.pen",
+  "method": "pen.dev MCP",
+  "screenCount": 30,
+  "validation": {
+    "checkedLayers": 2397,
+    "layoutIssues": 0
+  },
+  "roots": {
+    "00-board": "bi8Au",
+    "P01-desktop": "IeeDM",
+    "P01-mobile": "mMh1g",
+    "P02-desktop": "crEmB",
+    "P02-mobile": "r7M3q",
+    "P03-desktop": "d7vEec",
+    "P03-mobile": "DmGSO",
+    "P04-desktop": "AeVQp",
+    "P04-mobile": "SWbqN",
+    "P05-desktop": "ndrmC",
+    "P05-mobile": "WzRdb",
+    "P06-desktop": "a2x1C",
+    "P06-mobile": "UbXeS",
+    "P07-desktop": "T7ij0",
+    "P07-mobile": "aMuPC",
+    "P08-desktop": "IqDm7",
+    "P08-mobile": "VkwX5",
+    "M01-mobile": "bksR0",
+    "M02-mobile": "GijDk",
+    "M03-mobile": "CdNKV",
+    "M04-mobile": "bfvjZ",
+    "M05-mobile": "BDzXJ",
+    "M06-mobile": "vQqYM",
+    "M07-mobile": "Jr9rz",
+    "A01-mobile": "piDN8",
+    "A02-mobile": "P8UJd",
+    "A03-mobile": "E1dQ9k",
+    "A04-mobile": "zfkJL",
+    "A05-mobile": "P6tvYD",
+    "A06-mobile": "r7Hu2",
+    "A07-mobile": "PdO3u"
+  },
+  "boards": {
+    "page-map": "MTy1Z",
+    "theme-assets": "W7pInu"
+  },
+  "components": {
+    "brand": "I25Jc",
+    "mark": "s6fNj",
+    "button": "YxtZq",
+    "tag": "dVQdn"
+  }
+}
