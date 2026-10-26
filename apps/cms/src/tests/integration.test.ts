@@ -491,8 +491,8 @@ test(
           });
           assert.equal(saved.status, "saved");
           await run(
-            path.resolve("../../node_modules/.bin/tsx"),
-            ["src/scripts/media-worker.ts", "--once"],
+            process.execPath,
+            ["--import", "tsx", "src/scripts/media-worker.ts", "--once"],
             { cwd: process.cwd(), env: process.env, timeout: 60000 },
           );
           const processed = await payload.findByID({
@@ -523,7 +523,12 @@ test(
       );
     } finally {
       await closePayload(payload);
-      await rm(temp, { recursive: true, force: true });
+      await rm(temp, {
+        recursive: true,
+        force: true,
+        maxRetries: 5,
+        retryDelay: 100,
+      });
     }
   },
 );

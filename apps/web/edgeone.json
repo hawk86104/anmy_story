@@ -2,7 +2,7 @@
   "installCommand": "npm ci --prefix ../..",
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
-  "nodeVersion": "24.22.1",
+  "nodeVersion": "24.18.0",
   "headers": [
     {
       "source": "/*",

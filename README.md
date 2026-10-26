@@ -31,7 +31,9 @@ docs/               实施顺序、架构、运行与验证说明
 
 ## 本地运行
 
-需要 Node.js 24.22.1+（或 22.23.4+）、npm、系统 FFmpeg 和 FFprobe。可用 `.nvmrc` 选择版本。Ubuntu/Debian 可安装 `ffmpeg` 包，macOS 可使用 `brew install ffmpeg`。
+统一使用 Node.js **24.18.0**、npm、系统 FFmpeg 和 FFprobe。可用 `.nvmrc` 选择版本，CI 同样读取该文件。Ubuntu/Debian 可安装 `ffmpeg` 包，macOS 可使用 `brew install ffmpeg`。
+
+当前 Payload 3.92.0 的 Node 版本声明不包含 24.18.0，安装时会出现 `EBADENGINE` 警告；本地已在指定版本完成安装、测试、构建与启动验证，具体范围见[验证说明](docs/VALIDATION.md)。这不代表第三方依赖已声明支持该版本，启用 `engine-strict` 的环境仍会拒绝安装。
 
 ```bash
 git clone https://github.com/hawk86104/anmy_story.git

@@ -32,7 +32,7 @@ sudo apt-get update
 sudo apt-get install -y git ffmpeg sqlite3
 ```
 
-3. 用宝塔 Node 版本管理器或现有 Node 管理工具安装 **Node.js 24.22.1+**。不要使用 Ubuntu 默认仓库中的旧版 Node。以下命令须在该 Node 环境下运行：
+3. 用宝塔 Node 版本管理器或现有 Node 管理工具安装 **Node.js 24.18.0**，与本地、CI 和 EO 构建保持一致。以下命令须在该 Node 环境下运行：
 
 ```bash
 node --version
@@ -144,7 +144,7 @@ curl -f https://story.icegl.cn/api/health
 | 安装命令 | `npm ci --prefix ../..`                                             |
 | 构建命令 | `npm run build`                                                     |
 | 输出目录 | `.next`                                                             |
-| Node     | `24.22.1`，由 `edgeone.json` 与 `.nvmrc` 指定；检查构建日志实际版本 |
+| Node     | `24.18.0`，由 `edgeone.json` 与 `.nvmrc` 指定；检查构建日志实际版本 |
 
 根目录只设置工作路径；`npm ci --prefix ../..` 从 `apps/web` 使用仓库根目录的 npm workspaces、锁文件和 `packages/shared`。完整命令配置已放在 `apps/web/edgeone.json`。不要把输出目录设成 `out`，当前前台含服务端渲染；也不要在 EO 调用仓库根的 `npm run build`，该命令会同时构建后台。
 
@@ -152,7 +152,7 @@ curl -f https://story.icegl.cn/api/health
 
 如果控制台安装命令输入框左侧已经固定显示 `npm`，只在后面的输入框填写 `ci --prefix ../..`；如果输入框要求完整命令，则填写 `npm ci --prefix ../..`。构建日志最终应显示 `[builder] InstallCommand: npm ci --prefix ../..`。不要填写 `cd ../.. && npm ci`，否则补上包管理器前缀后会成为 `npm cd ...`，报 `Unknown command: "cd"`。
 
-构建日志里的实际 Node 版本应为 `v24.22.1`。如果仍显示 `v22.21.1`，先确认部署提交已包含本部署 PR，根目录为 `apps/web`，并清除控制台中与仓库配置冲突的旧命令 / Node 设置，再基于最新提交重新部署。项目要求 Node `^22.23.4 || >=24.22.1`；不要通过忽略版本检查继续使用旧版。
+构建日志里的实际 Node 版本应为 `v24.18.0`。如果版本不同，先确认部署提交已包含当前版本配置，根目录为 `apps/web`，并清除控制台中与仓库配置冲突的旧命令 / Node 设置，再基于最新提交重新部署。仓库根目录的 `engines.node` 固定为 `24.18.0`；第三方依赖的版本声明与本地实测结果见[验证说明](VALIDATION.md)。
 
 在 EO 项目设置中加入 [前台环境变量](../deploy/tencent/web.env.example)：
 

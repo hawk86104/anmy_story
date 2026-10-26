@@ -18,7 +18,7 @@
     "media:worker": "npm run media:worker --workspace @mylife/cms"
   },
   "engines": {
-    "node": "^22.23.4 || >=24.22.1"
+    "node": "24.18.0"
   },
   "overrides": {
     "@esbuild-kit/core-utils": {
