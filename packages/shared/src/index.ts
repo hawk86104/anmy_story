@@ -90,6 +90,23 @@ export interface EntryInput {
   revision?: number;
   clientId: string;
 }
+export type PublicEntry = Pick<
+  Entry,
+  | "id"
+  | "type"
+  | "title"
+  | "content"
+  | "reflection"
+  | "learning"
+  | "occurredAt"
+  | "datePrecision"
+  | "dateNote"
+  | "revision"
+> & {
+  retrospective?: boolean;
+  tags?: { label: string }[];
+  media: Media[];
+};
 export function displayDate(
   entry: Pick<Entry, "occurredAt" | "datePrecision" | "dateNote">,
 ): string {

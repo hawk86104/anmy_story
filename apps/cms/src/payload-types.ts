@@ -129,7 +129,7 @@ export interface User {
   role: 'child' | 'parent';
   familyId: string;
   /**
-   * 关闭时，孩子仍可直接保存家庭记录，公开展示需要家长审批。
+   * 旧版兼容字段。孩子现在可以直接选择公开，无需预授权。
    */
   allowPublicPublishing?: boolean | null;
   updatedAt: string;
@@ -200,6 +200,8 @@ export interface Entry {
   createdAt: string;
 }
 /**
+ * 家长可删除未被记录使用的素材；已关联素材需先从记录中移除。
+ *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "media".
  */

@@ -1,8 +1,9 @@
 import path from "node:path";
 import sharp from "sharp";
-import type { AccessResult, CollectionConfig } from "payload";
+import type { AccessResult, CollectionConfig, Where } from "payload";
 import { APIError } from "payload";
-import { authenticated, familyOnly, member } from "../lib/access";
+import { authenticated, member, relationId } from "../lib/access";
+import { publicEntryWhere } from "../lib/public-entries";
 
 export const mediaRoot = path.resolve(process.env.MEDIA_ROOT || "./media");
 export const Media: CollectionConfig = {
@@ -12,26 +13,72 @@ export const Media: CollectionConfig = {
     useAsTitle: "filename",
     defaultColumns: ["filename", "mimeType", "filesize", "processingStatus"],
     group: "成长档案",
+    description: "家长可删除未被记录使用的素材；已关联素材需先从记录中移除。",
   },
   access: {
     create: authenticated,
-    delete: () => false,
-    update: familyOnly,
+    delete: ({ req }) => {
+      const u = member(req);
+      return u?.role === "parent"
+        ? { familyId: { equals: u.familyId } }
+        : false;
+    },
+    update: ({ req }): AccessResult => {
+      const u = member(req);
+      if (!u) return false;
+      return u.role === "parent"
+        ? { familyId: { equals: u.familyId } }
+        : {
+            and: [
+              { familyId: { equals: u.familyId } },
+              { owner: { equals: u.id } },
+            ],
+          };
+    },
     read: async ({ req }): Promise<AccessResult> => {
       const u = member(req);
-      if (u) return { familyId: { equals: u.familyId } };
       const publicDocs = await req.payload.find({
         collection: "entries",
-        where: { publicSnapshot: { exists: true } },
-        limit: 1000,
+        where:
+          u?.role === "child"
+            ? {
+                or: [
+                  publicEntryWhere,
+                  {
+                    and: [
+                      { familyId: { equals: u.familyId } },
+                      { author: { equals: u.id } },
+                    ],
+                  },
+                ],
+              }
+            : publicEntryWhere,
+        pagination: false,
+        limit: 0,
         depth: 0,
         overrideAccess: true,
         req,
       });
-      const ids = publicDocs.docs.flatMap(
-        (d) => (d.publicSnapshot as { media?: number[] } | null)?.media || [],
+      const ids = publicDocs.docs.flatMap((d) =>
+        u?.role === "child" &&
+        d.familyId === u.familyId &&
+        relationId(d.author) === u.id
+          ? (d.media || []).map(relationId)
+          : (d.publicMedia || []).map(relationId),
       );
-      return ids.length ? { id: { in: ids } } : false;
+      const permissions: Where[] = ids.length ? [{ id: { in: ids } }] : [];
+      if (u)
+        permissions.push(
+          u.role === "parent"
+            ? { familyId: { equals: u.familyId } }
+            : {
+                and: [
+                  { familyId: { equals: u.familyId } },
+                  { owner: { equals: u.id } },
+                ],
+              },
+        );
+      return permissions.length ? { or: permissions } : false;
     },
   },
   upload: {
@@ -53,6 +100,37 @@ export const Media: CollectionConfig = {
     ],
   },
   hooks: {
+    beforeDelete: [
+      async ({ id, req }) => {
+        const media = await req.payload.findByID({
+          collection: "media",
+          id,
+          depth: 0,
+          overrideAccess: true,
+          req,
+        });
+        if (["queued", "processing"].includes(media.processingStatus || ""))
+          throw new APIError(
+            "视频正在排队或处理中，请等处理完成后再删除。",
+            409,
+          );
+        const linked = await req.payload.find({
+          collection: "entries",
+          where: {
+            or: [{ media: { in: [id] } }, { publicMedia: { in: [id] } }],
+          },
+          limit: 1,
+          depth: 0,
+          overrideAccess: true,
+          req,
+        });
+        if (linked.docs.length)
+          throw new APIError(
+            "这份素材仍被成长记录使用，请先从记录中移除后再删除。",
+            409,
+          );
+      },
+    ],
     beforeOperation: [
       async ({ args, operation, req }) => {
         if (

@@ -26,7 +26,7 @@ export function MediaView({
         <span>
           {media.processingError || "文字已经存好，处理完成后视频会自动出现。"}
         </span>
-        {media.processingStatus === "failed" && (
+        {media.processingStatus === "failed" && onRetry && (
           <button
             className="text-button"
             onClick={async () => {

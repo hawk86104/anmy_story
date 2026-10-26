@@ -88,7 +88,8 @@ export const Users: CollectionConfig = {
       type: "checkbox",
       defaultValue: false,
       admin: {
-        description: "关闭时，孩子仍可直接保存家庭记录，公开展示需要家长审批。",
+        hidden: true,
+        description: "旧版兼容字段。孩子现在可以直接选择公开，无需预授权。",
       },
       access: {
         create: ({ req }) => member(req)?.role === "parent",

@@ -181,20 +181,16 @@ export default function Timeline() {
                           <span>
                             {ENTRY_TYPES.find((t) => t.value === e.type)?.label}
                           </span>
-                          {e.reviewStatus === "pending" ? (
-                            <span>公开待家长确认</span>
-                          ) : (
-                            <span>
-                              {e.visibility === "public" ? (
-                                <Globe2 size={12} />
-                              ) : (
-                                <LockKeyhole size={12} />
-                              )}
-                              {e.visibility === "public"
-                                ? "公开展示"
-                                : "家人可见"}
-                            </span>
-                          )}
+                          <span>
+                            {e.visibility === "public" ? (
+                              <Globe2 size={12} />
+                            ) : (
+                              <LockKeyhole size={12} />
+                            )}
+                            {e.visibility === "public"
+                              ? "所有人可见"
+                              : "仅自己和家长可见"}
+                          </span>
                           {e.tags?.slice(0, 2).map((t) => (
                             <span key={t.label}>#{t.label}</span>
                           ))}

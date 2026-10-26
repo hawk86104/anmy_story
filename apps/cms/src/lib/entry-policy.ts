@@ -42,12 +42,7 @@ export function validateEntry(data: Record<string, unknown>) {
 }
 
 export function resolvePublication(input: {
-  role: "parent" | "child";
-  allowPublic: boolean;
   requestedVisibility: string;
-  requestedReview: string;
-  previousReview?: string;
-  contentChanged: boolean;
   status: string;
 }) {
   if (input.status !== "saved" || input.requestedVisibility !== "public")
@@ -56,26 +51,9 @@ export function resolvePublication(input: {
       reviewStatus: "none",
       publicRequested: false,
     };
-  const canPublish = input.role === "parent" || input.allowPublic;
-  const approve =
-    canPublish &&
-    (input.role === "child" || input.requestedReview === "approved");
-  if (approve)
-    return {
-      visibility: "public",
-      reviewStatus: "approved",
-      publicRequested: false,
-    };
-  if (input.role === "parent" && input.requestedReview === "rejected")
-    return {
-      visibility: "family",
-      reviewStatus: "rejected",
-      publicRequested: false,
-    };
-  // Saving remains immediate. A review request never grants public read access.
   return {
-    visibility: "family",
-    reviewStatus: "pending",
-    publicRequested: true,
+    visibility: "public",
+    reviewStatus: "approved",
+    publicRequested: false,
   };
 }

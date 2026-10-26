@@ -75,8 +75,7 @@ const initial = (entry?: Entry): EntryInput => ({
   tags: entry?.tags || [],
   media: entry?.media?.map((m) => (typeof m === "number" ? m : m.id)) || [],
   status: "saved",
-  visibility:
-    entry?.visibility || (entry?.publicRequested ? "public" : "family"),
+  visibility: entry?.visibility || "family",
   revision: entry?.revision,
   clientId: crypto.randomUUID(),
 });
@@ -134,10 +133,10 @@ export function EntryEditor({
     setForm((f) => ({ ...f, [key]: value }));
   const hasContent = Boolean(
     form.title.trim() ||
-      form.content.trim() ||
-      form.reflection.trim() ||
-      form.learning.trim() ||
-      items.length,
+    form.content.trim() ||
+    form.reflection.trim() ||
+    form.learning.trim() ||
+    items.length,
   );
   const busy = items.some(
     (i) => i.status === "uploading" || i.status === "compressing",
@@ -450,9 +449,6 @@ export function EntryEditor({
       ...form,
       media: items.flatMap((i) => (i.media ? [i.media.id] : [])),
       status,
-      ...(user.role === "parent" && form.visibility === "public"
-        ? { reviewStatus: "approved" }
-        : {}),
     };
     if (data.datePrecision === "unknown") data.occurredAt = null;
     else if (data.occurredAt)
@@ -823,17 +819,15 @@ export function EntryEditor({
                 )}
                 <span>
                   {form.visibility === "family"
-                    ? "仅家人可见"
-                    : user.role === "parent" || user.allowPublicPublishing
-                      ? "公开展示"
-                      : "申请公开展示"}
+                    ? "仅自己和家长可见"
+                    : "所有人可见"}
                 </span>
                 <ChevronDown size={13} />
               </button>
               <small>
                 {form.visibility === "family"
-                  ? "小世界里的故事，安心留给家人"
-                  : "记录立即保存，公开权限单独确认"}
+                  ? "只有你和家长可以查看"
+                  : "保存后直接公开，游客也能查看"}
               </small>
             </div>
             <div className="submit-buttons">
@@ -887,7 +881,7 @@ export function EntryEditor({
             <div>
               <strong>这是你安心记录的地方</strong>
               <p>
-                记录默认只对家人可见。
+                记录默认只对你和家长可见。
                 <br />
                 保存以后，也能随时修改。
               </p>
@@ -1079,20 +1073,15 @@ export function EntryEditor({
                   [
                     {
                       value: "family",
-                      title: "仅家人可见",
+                      title: "仅自己和家长可见",
                       description: "只有你和已加入的家长可以查看",
                       Icon: LockKeyhole,
                     },
                     {
                       value: "public",
-                      title:
-                        user.role === "parent" || user.allowPublicPublishing
-                          ? "公开展示"
-                          : "申请公开展示",
+                      title: "所有人可见",
                       description:
-                        user.role === "parent" || user.allowPublicPublishing
-                          ? "允许访客在个人主页查看"
-                          : "先保存家庭记录，再请家长确认是否公开",
+                        "保存后直接公开，所有人（包括未登录的游客）都能查看",
                       Icon: Globe2,
                     },
                   ] as const

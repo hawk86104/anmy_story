@@ -130,11 +130,9 @@ export default function EntryPage({
                 : "这一刻，好好收藏了。"}
             </strong>
             <p>
-              {entry.publicRequested
-                ? "记录已保存，公开申请等家长确认后生效。"
-                : entry.visibility === "public"
-                  ? "这段记忆已经公开展示。"
-                  : "已经留在家庭空间，只有你和家人可以查看。"}
+              {entry.visibility === "public"
+                ? "这段记忆已经公开，所有人（包括游客）都能查看。"
+                : "已经留在家庭空间，只有你和家长可以查看。"}
             </p>
           </div>
           <button aria-label="关闭保存提示" onClick={() => setSaved(false)}>
@@ -163,7 +161,9 @@ export default function EntryPage({
             {typeof entry.author === "number" ? "家人记录" : entry.author.name}
           </span>
           <span>·</span>
-          <span>{entry.visibility === "public" ? "公开展示" : "家人可见"}</span>
+          <span>
+            {entry.visibility === "public" ? "所有人可见" : "仅自己和家长可见"}
+          </span>
           {canEdit && (
             <button
               className="text-button"
@@ -232,29 +232,27 @@ export default function EntryPage({
             disabled={busy}
             onClick={() =>
               void update({
-                visibility:
-                  entry.visibility === "public" || entry.publicRequested
-                    ? "family"
-                    : "public",
-                ...(user.role === "parent" && entry.visibility === "family"
-                  ? { reviewStatus: "approved" }
-                  : {}),
+                visibility: entry.visibility === "public" ? "family" : "public",
               })
             }
           >
             {busy ? (
               <LoaderCircle size={15} className="spin" />
-            ) : entry.visibility === "public" || entry.publicRequested ? (
+            ) : entry.visibility === "public" ? (
               <LockKeyhole size={15} />
             ) : (
               <Globe2 size={15} />
             )}
-            {entry.visibility === "public" || entry.publicRequested
-              ? "改为仅家人可见"
-              : user.role === "parent" || user.allowPublicPublishing
-                ? "公开这段记忆"
-                : "申请公开展示"}
+            {entry.visibility === "public"
+              ? "改为仅自己和家长可见"
+              : "公开这段记忆"}
           </button>
+        )}
+        {entry.visibility === "public" && entry.status === "saved" && (
+          <Link className="text-button" href={`/entries/${entry.id}`}>
+            <Globe2 size={15} />
+            查看公开页面
+          </Link>
         )}
         <button
           className="text-button"

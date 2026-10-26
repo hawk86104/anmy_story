@@ -7,12 +7,14 @@ import { randomUUID, randomBytes } from "node:crypto";
 import { promisify } from "node:util";
 import { execFile } from "node:child_process";
 import sharp from "sharp";
-import type { Payload } from "payload";
+import { createLocalReq, type Payload } from "payload";
+import type { PublicEntry } from "@mylife/shared";
 import type { Entry as PayloadEntry } from "../payload-types";
 import { closePayload } from "../lib/shutdown";
+import { publicEntryEndpoints } from "../lib/public-entries";
 
 test(
-  "家庭记录、权限、原文、审核快照与真实媒体处理",
+  "家庭记录、两种隐私、游客详情、素材删除与真实媒体处理",
   { timeout: 180000 },
   async (t) => {
     const temp = await mkdtemp(path.join(tmpdir(), "mylife-test-"));
@@ -59,6 +61,26 @@ test(
       },
       ...bootstrap,
     });
+    const sibling = await payload.create({
+      collection: "users",
+      data: {
+        name: "同家庭的其他孩子",
+        email: "sibling@example.invalid",
+        password: randomBytes(20).toString("hex"),
+        role: "child",
+        familyId: family,
+      },
+      ...bootstrap,
+    });
+    const publicList = async () =>
+      publicEntryEndpoints[0].handler(await createLocalReq({}, payload));
+    const publicDetail = async (id: number | string) =>
+      publicEntryEndpoints[1].handler(
+        await createLocalReq(
+          { req: { routeParams: { id: String(id) } } },
+          payload,
+        ),
+      );
     const base = () => ({
       type: "quick" as const,
       content: "今天终于学会了骑自行车。",
@@ -133,7 +155,7 @@ test(
         assert.equal(versions.totalDocs, 0);
       });
       await t.test(
-        "公开请求不自动公开，家长审批生成快照；编辑保留已批准版本，撤回立即清空",
+        "孩子无需预授权即可直接公开，修改立即更新，家长公开也无需审批，撤回立即清空",
         async () => {
           entry = await payload.update({
             collection: "entries",
@@ -146,17 +168,9 @@ test(
             user: child,
             overrideAccess: false,
           });
-          assert.equal(entry.visibility, "family");
-          assert.equal(entry.reviewStatus, "pending");
-          assert.equal(entry.publicSnapshot, null);
-          entry = await payload.update({
-            collection: "entries",
-            id: entry.id,
-            data: { visibility: "public", reviewStatus: "approved" },
-            user: parent,
-            overrideAccess: false,
-          });
           assert.equal(entry.visibility, "public");
+          assert.equal(entry.reviewStatus, "approved");
+          assert.equal(entry.publicRequested, false);
           assert.equal(
             (entry.publicSnapshot as { content: string }).content,
             "今天终于学会了骑自行车。",
@@ -172,12 +186,24 @@ test(
             user: child,
             overrideAccess: false,
           });
-          assert.equal(entry.reviewStatus, "pending");
+          assert.equal(entry.reviewStatus, "approved");
           assert.equal(
             (entry.publicSnapshot as { content: string }).content,
-            "今天终于学会了骑自行车。",
+            "今天又练了一会儿。",
           );
           assert.equal(entry.originalText, "今天终于学会了骑自行车。");
+          entry = await payload.update({
+            collection: "entries",
+            id: entry.id,
+            data: { content: "家长帮忙补充的正文。" },
+            user: parent,
+            overrideAccess: false,
+          });
+          assert.equal(entry.visibility, "public");
+          assert.equal(
+            (entry.publicSnapshot as { content: string }).content,
+            "家长帮忙补充的正文。",
+          );
           entry = await payload.update({
             collection: "entries",
             id: entry.id,
@@ -187,6 +213,106 @@ test(
           });
           assert.equal(entry.publicSnapshot, null);
           assert.equal(entry.publicRequested, false);
+        },
+      );
+      await t.test("私密记录及历史只有记录人和同家庭家长可读", async () => {
+        await assert.rejects(
+          payload.findByID({
+            collection: "entries",
+            id: entry.id,
+            user: sibling,
+            overrideAccess: false,
+          }),
+        );
+        const versions = await payload.findVersions({
+          collection: "entries",
+          where: { parent: { equals: entry.id } },
+          user: sibling,
+          overrideAccess: false,
+        });
+        assert.equal(versions.totalDocs, 0);
+        for (const user of [child, parent]) {
+          assert.equal(
+            (
+              await payload.findByID({
+                collection: "entries",
+                id: entry.id,
+                user,
+                overrideAccess: false,
+              })
+            ).id,
+            entry.id,
+          );
+        }
+      });
+      await t.test(
+        "游客可读公开列表及完整详情，私密、草稿、归档和撤回记录不可读",
+        async () => {
+          const published = await payload.create({
+            collection: "entries",
+            data: {
+              ...base(),
+              visibility: "public",
+              reflection: "我很开心。",
+              learning: "练习会进步。",
+              tags: [{ label: "成长" }],
+              parentNote: "只给家人看的补充。",
+            },
+            user: parent,
+            overrideAccess: false,
+          });
+          const detail = await publicDetail(published.id);
+          assert.equal(detail.status, 200);
+          assert.equal(detail.headers.get("Cache-Control"), "no-store");
+          const doc: PublicEntry = await detail.json();
+          assert.equal(doc.id, published.id);
+          assert.equal(doc.content, published.content);
+          assert.equal(doc.reflection, "我很开心。");
+          assert.equal(doc.learning, "练习会进步。");
+          assert.deepEqual(doc.tags, [{ label: "成长" }]);
+          for (const key of [
+            "parentNote",
+            "originalText",
+            "familyId",
+            "author",
+            "editedBy",
+            "clientId",
+          ])
+            assert.equal(key in doc, false);
+          const list = await publicList();
+          assert.equal(list.headers.get("Cache-Control"), "no-store");
+          assert.ok(
+            (await list.json()).docs.some(
+              (item: PublicEntry) => item.id === published.id,
+            ),
+          );
+          assert.equal((await publicDetail(entry.id)).status, 404);
+          assert.equal((await publicDetail("invalid")).status, 404);
+          assert.equal((await publicDetail(999999999)).status, 404);
+          for (const status of ["draft", "archived"] as const) {
+            const privateEntry = await payload.create({
+              collection: "entries",
+              data: { ...base(), status, visibility: "public" },
+              user: child,
+              overrideAccess: false,
+            });
+            assert.equal(privateEntry.visibility, "family");
+            assert.equal(privateEntry.publicSnapshot, null);
+            assert.equal((await publicDetail(privateEntry.id)).status, 404);
+          }
+          await payload.update({
+            collection: "entries",
+            id: published.id,
+            data: { visibility: "family" },
+            user: parent,
+            overrideAccess: false,
+          });
+          assert.equal((await publicDetail(published.id)).status, 404);
+          assert.ok(
+            !(await (await publicList()).json()).docs.some(
+              (item: PublicEntry) => item.id === published.id,
+            ),
+          );
         },
       );
       await t.test("孩子无法提升账号角色、预授权或更改所属家庭", async () => {
@@ -387,6 +513,31 @@ test(
             }),
           );
           await assert.rejects(
+            payload.findByID({
+              collection: "media",
+              id: media.id,
+              user: sibling,
+              overrideAccess: false,
+            }),
+          );
+          await assert.rejects(
+            payload.update({
+              collection: "media",
+              id: media.id,
+              data: { alt: "越权读取" },
+              user: sibling,
+              overrideAccess: false,
+            }),
+          );
+          await assert.rejects(
+            payload.create({
+              collection: "entries",
+              data: { ...base(), media: [media.id] },
+              user: sibling,
+              overrideAccess: false,
+            }),
+          );
+          await assert.rejects(
             payload.create({
               collection: "entries",
               data: { ...base(), media: [media.id] },
@@ -418,8 +569,8 @@ test(
           await payload.update({
             collection: "entries",
             id: linked.id,
-            data: { visibility: "public", reviewStatus: "approved" },
-            user: parent,
+            data: { visibility: "public" },
+            user: child,
             overrideAccess: false,
           });
           assert.equal(
@@ -432,6 +583,26 @@ test(
             ).id,
             media.id,
           );
+          for (const user of [stranger, sibling]) {
+            assert.equal(
+              (
+                await payload.findByID({
+                  collection: "media",
+                  id: media.id,
+                  user,
+                  overrideAccess: false,
+                })
+              ).id,
+              media.id,
+            );
+          }
+          const publicEntry: PublicEntry = await (
+            await publicDetail(linked.id)
+          ).json();
+          assert.equal(publicEntry.media[0].id, media.id);
+          assert.equal(publicEntry.media[0].url, media.url);
+          assert.equal("owner" in publicEntry.media[0], false);
+          assert.equal("familyId" in publicEntry.media[0], false);
           await payload.update({
             collection: "entries",
             id: linked.id,
@@ -445,6 +616,141 @@ test(
               id: media.id,
               overrideAccess: false,
             }),
+          );
+          assert.equal((await publicDetail(linked.id)).status, 404);
+        },
+      );
+      await t.test(
+        "家长上传并关联到孩子记录的素材，记录人仍可读取",
+        async () => {
+          const image = await sharp({
+            create: { width: 4, height: 4, channels: 3, background: "#aacc99" },
+          })
+            .png()
+            .toBuffer();
+          const media = await payload.create({
+            collection: "media",
+            data: { familyId: family },
+            file: {
+              data: image,
+              name: "parent-photo.png",
+              mimetype: "image/png",
+              size: image.length,
+            },
+            user: parent,
+            overrideAccess: false,
+          });
+          const ownEntry = await payload.create({
+            collection: "entries",
+            data: base(),
+            user: child,
+            overrideAccess: false,
+          });
+          await payload.update({
+            collection: "entries",
+            id: ownEntry.id,
+            data: { media: [media.id] },
+            user: parent,
+            overrideAccess: false,
+          });
+          assert.equal(
+            (
+              await payload.findByID({
+                collection: "media",
+                id: media.id,
+                user: child,
+                overrideAccess: false,
+              })
+            ).id,
+            media.id,
+          );
+          await payload.update({
+            collection: "entries",
+            id: ownEntry.id,
+            data: { content: "孩子继续编辑自己的记录。" },
+            user: child,
+            overrideAccess: false,
+          });
+          await assert.rejects(
+            payload.findByID({
+              collection: "media",
+              id: media.id,
+              user: sibling,
+              overrideAccess: false,
+            }),
+          );
+        },
+      );
+      await t.test(
+        "仅同家庭家长可删除闲置素材，关联记录和转码任务受保护，文件同步清理",
+        async () => {
+          const image = await sharp({
+            create: { width: 4, height: 4, channels: 3, background: "#aacc99" },
+          })
+            .png()
+            .toBuffer();
+          const media = await payload.create({
+            collection: "media",
+            data: { familyId: family },
+            file: {
+              data: image,
+              name: "delete-photo.png",
+              mimetype: "image/png",
+              size: image.length,
+            },
+            user: child,
+            overrideAccess: false,
+          });
+          const deleteMedia = (user?: typeof parent) =>
+            payload.delete({
+              collection: "media",
+              id: media.id,
+              user,
+              overrideAccess: false,
+            });
+          await assert.rejects(deleteMedia());
+          await assert.rejects(deleteMedia(child));
+          await assert.rejects(deleteMedia(stranger));
+          for (const processingStatus of ["queued", "processing"] as const) {
+            await payload.update({
+              collection: "media",
+              id: media.id,
+              data: { processingStatus },
+              context: { mediaWorker: true },
+            });
+            await assert.rejects(deleteMedia(parent), /排队或处理中/);
+          }
+          await payload.update({
+            collection: "media",
+            id: media.id,
+            data: { processingStatus: "ready" },
+            context: { mediaWorker: true },
+          });
+          const linked = await payload.create({
+            collection: "entries",
+            data: { ...base(), visibility: "public", media: [media.id] },
+            user: child,
+            overrideAccess: false,
+          });
+          await assert.rejects(deleteMedia(parent), /仍被成长记录使用/);
+          await access(path.join(temp, "media", media.filename!));
+          await payload.update({
+            collection: "entries",
+            id: linked.id,
+            data: { media: [] },
+            user: child,
+            overrideAccess: false,
+          });
+          assert.deepEqual(
+            (await (await publicDetail(linked.id)).json()).media,
+            [],
+          );
+          await deleteMedia(parent);
+          await assert.rejects(
+            payload.findByID({ collection: "media", id: media.id }),
+          );
+          await assert.rejects(
+            access(path.join(temp, "media", media.filename!)),
           );
         },
       );

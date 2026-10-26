@@ -1,14 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, Sprout, LockKeyhole, BookOpen } from "lucide-react";
 import { Brand } from "@/components/brand";
-interface PublicEntry {
-  id: number;
-  title?: string;
-  type: string;
-  content: string;
-  occurredAt?: string;
-  datePrecision: string;
-}
+import { displayDate, entryTitle, type PublicEntry } from "@mylife/shared";
 export default async function PublicHome() {
   let entries: PublicEntry[] = [];
   try {
@@ -51,18 +44,24 @@ export default async function PublicHome() {
         {entries.length ? (
           <div className="public-entries">
             {entries.map((e) => (
-              <article key={e.id}>
-                <BookOpen size={22} />
-                <time>
-                  {e.datePrecision === "year"
-                    ? e.occurredAt?.slice(0, 4)
-                    : e.datePrecision === "month"
-                      ? e.occurredAt?.slice(0, 7)
-                      : e.occurredAt?.slice(0, 10) || "一段珍贵的记忆"}
-                </time>
-                <h3>{e.title || e.content.slice(0, 32) || "一段成长记录"}</h3>
-                <p>{e.content}</p>
-              </article>
+              <Link
+                key={e.id}
+                href={`/entries/${e.id}`}
+                className="public-entry-link"
+              >
+                <article>
+                  <BookOpen size={22} />
+                  <time>{displayDate(e)}</time>
+                  <h3>{entryTitle(e)}</h3>
+                  <p>
+                    {e.content.slice(0, 180)}
+                    {e.content.length > 180 && "…"}
+                  </p>
+                  <span className="public-read-more">
+                    阅读这段记忆 <ArrowRight size={14} />
+                  </span>
+                </article>
+              </Link>
             ))}
           </div>
         ) : (
@@ -75,7 +74,8 @@ export default async function PublicHome() {
       </section>
       <footer>
         <LockKeyhole size={13} />
-        这里只展示获准公开的记忆。<span>my life, my story.</span>
+        这里只展示选择公开的记忆，游客也可以查看。
+        <span>my life, my story.</span>
       </footer>
     </main>
   );

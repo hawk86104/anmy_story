@@ -17,9 +17,14 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     api<{ user: Member | null }>("/users/me")
       .then((r) => {
         if (!active) return;
-        if (!r.user)
-          router.replace(`/login?next=${encodeURIComponent(pathname)}`);
-        else setUser(r.user);
+        if (!r.user) {
+          const entryPath = pathname.match(/^\/app\/entries\/([^/]+)$/);
+          router.replace(
+            entryPath
+              ? `/entries/${entryPath[1]}`
+              : `/login?next=${encodeURIComponent(pathname)}`,
+          );
+        } else setUser(r.user);
       })
       .catch(() => {
         if (active) setError("暂时无法连接成长空间，请检查网络后重试。");

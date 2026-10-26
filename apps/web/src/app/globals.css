@@ -2051,11 +2051,31 @@ label select {
   gap: 20px;
 }
 .public-entries article {
+  height: 100%;
   padding: 30px;
   border: 1px solid #e2ead5;
   border-radius: 10px;
   background: white;
   color: #8aa173;
+}
+.public-entry-link {
+  display: block;
+  border-radius: 10px;
+}
+.public-entry-link:hover article,
+.public-entry-link:focus-visible article {
+  border-color: #a5bb8d;
+}
+.public-read-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  margin-top: 16px;
+}
+.public-detail {
+  max-width: 850px;
+  margin: 35px auto 60px;
 }
 .public-entries time {
   display: block;

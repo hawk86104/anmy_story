@@ -108,7 +108,7 @@ export default function Login() {
         </form>
         <p className="privacy-note">
           <LockKeyhole size={14} />
-          只有你和家人，能看到家庭记录
+          私密记录只有你和家长能看到
         </p>
         <small className="login-help">首次使用请由家长建立家庭账号。</small>
       </section>

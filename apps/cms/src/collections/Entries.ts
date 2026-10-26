@@ -1,13 +1,7 @@
-import type { CollectionConfig } from "payload";
+import type { AccessResult, CollectionConfig } from "payload";
 import { APIError } from "payload";
 import { ENTRY_TYPES } from "@mylife/shared";
-import {
-  authenticated,
-  editEntry,
-  familyOnly,
-  member,
-  relationId,
-} from "../lib/access";
+import { authenticated, editEntry, member, relationId } from "../lib/access";
 import {
   normalizeDate,
   resolvePublication,
@@ -19,18 +13,26 @@ export const Entries: CollectionConfig = {
   labels: { singular: "成长记录", plural: "成长记录" },
   admin: {
     useAsTitle: "title",
-    defaultColumns: ["title", "type", "status", "reviewStatus", "occurredAt"],
+    defaultColumns: ["title", "type", "status", "visibility", "occurredAt"],
     group: "成长档案",
   },
   versions: { maxPerDoc: 100 },
   access: {
     create: authenticated,
-    read: familyOnly,
+    read: editEntry,
     update: editEntry,
     delete: () => false,
-    readVersions: ({ req }) => {
+    readVersions: ({ req }): AccessResult => {
       const u = member(req);
-      return u ? { "version.familyId": { equals: u.familyId } } : false;
+      if (!u) return false;
+      return u.role === "parent"
+        ? { "version.familyId": { equals: u.familyId } }
+        : {
+            and: [
+              { "version.familyId": { equals: u.familyId } },
+              { "version.author": { equals: u.id } },
+            ],
+          };
     },
   },
   hooks: {
@@ -83,7 +85,8 @@ export const Entries: CollectionConfig = {
             },
             limit: 12,
             depth: 0,
-            overrideAccess: true,
+            user: req.user,
+            overrideAccess: false,
             req,
           });
           if (media.docs.length !== new Set(ids).size)
@@ -96,30 +99,16 @@ export const Entries: CollectionConfig = {
         const wantsPublic =
           intent.visibility !== undefined
             ? intent.visibility === "public"
-            : intent.publicRequested !== undefined
-              ? intent.publicRequested === true
-              : originalDoc?.publicRequested ||
-                originalDoc?.visibility === "public";
+            : originalDoc?.visibility === "public";
         const publication = resolvePublication({
-          role: u.role,
-          allowPublic: Boolean(u.allowPublicPublishing),
           requestedVisibility: wantsPublic ? "public" : "family",
-          requestedReview: String(
-            intent.reviewStatus ||
-              (originalDoc?.reviewStatus === "approved"
-                ? "pending"
-                : originalDoc?.reviewStatus) ||
-              "none",
-          ),
-          previousReview: originalDoc?.reviewStatus,
-          contentChanged: true,
           status: merged.status,
         });
         Object.assign(data, publication);
         const isApproved =
           publication.visibility === "public" &&
           publication.reviewStatus === "approved";
-        // The public API serves this explicit snapshot only, never a live private document.
+        // Publish only the fields intended for visitors; private metadata stays private.
         data.publicSnapshot = isApproved
           ? {
               id: originalDoc?.id,
@@ -131,12 +120,14 @@ export const Entries: CollectionConfig = {
               occurredAt: data.occurredAt,
               datePrecision: merged.datePrecision,
               dateNote: merged.dateNote,
+              retrospective: merged.retrospective,
+              tags: merged.tags?.map((tag: { label: string }) => ({
+                label: tag.label,
+              })),
               media: ids,
               revision: data.revision,
             }
-          : publication.publicRequested && originalDoc?.publicSnapshot
-            ? originalDoc.publicSnapshot
-            : null;
+          : null;
         data.publicMedia = data.publicSnapshot?.media || [];
         return data;
       },
@@ -236,8 +227,8 @@ export const Entries: CollectionConfig = {
       defaultValue: "family",
       required: true,
       options: [
-        { label: "家庭可见", value: "family" },
-        { label: "公开", value: "public" },
+        { label: "仅自己和家长可见", value: "family" },
+        { label: "所有人可见（包括游客）", value: "public" },
       ],
     },
     {
@@ -245,12 +236,14 @@ export const Entries: CollectionConfig = {
       label: "申请公开",
       type: "checkbox",
       defaultValue: false,
+      admin: { hidden: true },
     },
     {
       name: "reviewStatus",
       label: "公开审核",
       type: "select",
       defaultValue: "none",
+      admin: { hidden: true },
       options: [
         { label: "未申请", value: "none" },
         { label: "待家长确认", value: "pending" },

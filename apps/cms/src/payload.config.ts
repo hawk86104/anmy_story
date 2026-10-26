@@ -8,6 +8,7 @@ import { Users } from "./collections/Users";
 import { Entries } from "./collections/Entries";
 import { Media } from "./collections/Media";
 import { member } from "./lib/access";
+import { publicEntryEndpoints } from "./lib/public-entries";
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const webOrigin = process.env.WEB_ORIGIN || "http://localhost:3000";
 const cmsOrigin = process.env.CMS_ORIGIN || "http://localhost:3001";
@@ -60,29 +61,6 @@ export default buildConfig({
             })
           : Response.json({ error: "请先登录。" }, { status: 401 }),
     },
-    {
-      path: "/public/entries",
-      method: "get",
-      handler: async (req) => {
-        const entries = await req.payload.find({
-          collection: "entries",
-          where: { publicSnapshot: { exists: true } },
-          sort: "-occurredAt",
-          depth: 0,
-          limit: 100,
-          overrideAccess: true,
-          req,
-        });
-        return Response.json(
-          {
-            docs: entries.docs
-              .filter((d) => d.publicSnapshot)
-              .map((d) => ({ ...(d.publicSnapshot as object), id: d.id })),
-            totalDocs: entries.docs.filter((d) => d.publicSnapshot).length,
-          },
-          { headers: { "Cache-Control": "no-store" } },
-        );
-      },
-    },
+    ...publicEntryEndpoints,
   ],
 });
