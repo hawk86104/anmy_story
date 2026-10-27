@@ -8,6 +8,7 @@ import {
   validateEntry,
 } from "../lib/entry-policy";
 import { verifiedOriginal } from "../lib/ai-proof";
+import { entryConflict } from "../lib/entry-concurrency";
 
 export const Entries: CollectionConfig = {
   slug: "entries",
@@ -55,15 +56,14 @@ export const Entries: CollectionConfig = {
           data.revision !== undefined &&
           data.revision !== originalDoc.revision
         )
-          throw new APIError(
-            "这条记录已有新版本。请重新打开后再保存，当前草稿仍在此设备。",
-            409,
-          );
+          throw entryConflict();
         const merged = { ...originalDoc, ...data };
         validateEntry(merged);
         data.content = String(merged.content || "");
         const restoring =
           req.context.restoreArchive === true && u.role === "parent";
+        const importing =
+          req.context.importHistory === true && u.role === "parent";
         data.createdAt =
           originalDoc?.createdAt ||
           (restoring &&
@@ -75,7 +75,11 @@ export const Entries: CollectionConfig = {
         data.author = originalDoc?.author
           ? relationId(originalDoc.author)
           : u.id;
-        if (restoring && !originalDoc?.id && relationId(data.author)) {
+        if (
+          (restoring || importing) &&
+          !originalDoc?.id &&
+          relationId(data.author)
+        ) {
           const author = await req.payload.find({
             collection: "users",
             where: {

@@ -11,7 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { randomUUID, randomBytes } from "node:crypto";
-import { DatabaseSync } from "node:sqlite";
+import type { SQLiteAdapter } from "@payloadcms/db-sqlite";
 import sharp from "sharp";
 import { unzipSync } from "fflate";
 import { createLocalReq, type Payload, type Endpoint } from "payload";
@@ -91,44 +91,45 @@ test(
           await payload.db.migrate({ migrations: migrations.slice(0, -1) });
           parent = await createUser("parent@usagi.invalid", "parent");
           child = await createUser("child@usagi.invalid", "child");
-          const db = new DatabaseSync(path.join(temp, "test.db"));
+          const db = (payload.db as unknown as SQLiteAdapter).client;
           const snapshot = JSON.stringify({
             type: "quick",
             content: "升级前的公开记录",
             media: [],
             revision: 17,
           });
-          db.prepare(
-            "INSERT INTO entries (id,content,original_text,type,status,visibility,review_status,family_id,author_id,client_id,revision,public_snapshot) VALUES (9001,?,?,?,?,?,?,?,?,?,?,?)",
-          ).run(
-            "升级前的公开记录",
-            "孩子最初的表达",
-            "quick",
-            "saved",
-            "public",
-            "approved",
-            family,
-            child.id,
-            randomUUID(),
-            17,
-            snapshot,
-          );
-          db.prepare(
-            "INSERT INTO _entries_v (parent_id,version_type,version_content,version_original_text,version_family_id,version_author_id,version_client_id,version_revision,version_status,version_visibility,created_at,updated_at) VALUES (9001,?,?,?,?,?,?,?,?,?,?,?)",
-          ).run(
-            "quick",
-            "升级前保存的历史正文",
-            "孩子最初的表达",
-            family,
-            child.id,
-            randomUUID(),
-            16,
-            "saved",
-            "family",
-            new Date().toISOString(),
-            new Date().toISOString(),
-          );
-          db.close();
+          await db.execute({
+            sql: "INSERT INTO entries (id,content,original_text,type,status,visibility,review_status,family_id,author_id,client_id,revision,public_snapshot) VALUES (9001,?,?,?,?,?,?,?,?,?,?,?)",
+            args: [
+              "升级前的公开记录",
+              "孩子最初的表达",
+              "quick",
+              "saved",
+              "public",
+              "approved",
+              family,
+              child.id,
+              randomUUID(),
+              17,
+              snapshot,
+            ],
+          });
+          await db.execute({
+            sql: "INSERT INTO _entries_v (parent_id,version_type,version_content,version_original_text,version_family_id,version_author_id,version_client_id,version_revision,version_status,version_visibility,created_at,updated_at) VALUES (9001,?,?,?,?,?,?,?,?,?,?,?)",
+            args: [
+              "quick",
+              "升级前保存的历史正文",
+              "孩子最初的表达",
+              family,
+              child.id,
+              randomUUID(),
+              16,
+              "saved",
+              "family",
+              new Date().toISOString(),
+              new Date().toISOString(),
+            ],
+          });
           await payload.db.migrate({ migrations });
           await payload.db.migrate({ migrations });
           const old = await payload.findByID({
@@ -165,12 +166,14 @@ test(
       const { familyEndpoints } = await import("../lib/family-endpoints");
       const { publicEntryEndpoints } = await import("../lib/public-entries");
       const ai = await import("../lib/ai");
-      const { originalProof, verifiedOriginal } =
-        await import("../lib/ai-proof");
+      const { originalProof, verifiedOriginal } = await import(
+        "../lib/ai-proof"
+      );
       const archive = await import("../lib/archive");
       const { restoreFamilyArchive } = await import("../lib/restore");
-      const { Media, mediaRoot, originalsRoot } =
-        await import("../collections/Media");
+      const { Media, mediaRoot, originalsRoot } = await import(
+        "../collections/Media"
+      );
       const { mediaReferences } = await import("../lib/media-links");
       const photo = await sharp({
         create: { width: 24, height: 18, channels: 3, background: "#f6ce55" },

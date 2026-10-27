@@ -17,6 +17,7 @@ import {
 import { Brand } from "./brand";
 import { useSession } from "./session";
 import { Usagi } from "./theme";
+import { PwaControls } from "./pwa-controls";
 export function Shell({ children }: { children: React.ReactNode }) {
   const { user, logout } = useSession();
   const path = usePathname();
@@ -136,6 +137,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <span className="member-name">{user.name}</span>
           </div>
         </header>
+        <PwaControls />
         {children}
         <footer className="page-footer">
           每一段真实的成长，都有自己的光。

@@ -34,6 +34,8 @@ docs/               实施顺序、架构、运行与验证说明
 
 支持长期版本档案、JSON / Markdown / 媒体 / 项目 / 版本 ZIP 导出，以及默认只检查的恢复命令。新上传照片与视频可选择保留原件。功能、迁移与恢复说明见[本版迭代说明](docs/USAGI_ITERATION.md)。已有宝塔部署更新时先备份并执行迁移，具体见[更新部署](docs/DEPLOY_TENCENT.md#9-已部署站点的版本更新与回滚)。
 
+现已补齐记录的数据库原子版本保护、家长端 CSV / JSON 历史文字批量导入，以及可安装的离线记事外壳。使用入口与本地 / 宝塔更新步骤见 [Roadmap 迭代说明](docs/ROADMAP_ITERATION.md)。
+
 ## 本地运行
 
 统一使用 Node.js **24.18.0**、npm、系统 FFmpeg 和 FFprobe。可用 `.nvmrc` 选择版本，CI 同样读取该文件。Ubuntu/Debian 可安装 `ffmpeg` 包，macOS 可使用 `brew install ffmpeg`。

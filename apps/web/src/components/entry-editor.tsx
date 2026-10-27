@@ -43,6 +43,11 @@ import type {
 import { ENTRY_TYPES, displayDate } from "@mylife/shared";
 import { useSession } from "./session";
 import { api, sizeLabel, ApiError } from "@/lib/api";
+import {
+  readOfflineDraft,
+  removeOfflineDraft,
+  type OfflineDraft,
+} from "@/lib/offline-draft";
 import { mediaUrl } from "@/lib/urls";
 import { prepareImage, uploadMedia } from "@/lib/media";
 import { AttachmentLibrary } from "./media-picker";
@@ -128,10 +133,13 @@ export function EntryEditor({
   const [ready, setReady] = useState(false);
   const [draftStatus, setDraftStatus] = useState("");
   const [restored, setRestored] = useState(false);
+  const [offlineDraft, setOfflineDraft] = useState<OfflineDraft>();
+  const [bringingDraft, setBringingDraft] = useState(false);
   const [sheet, setSheet] = useState<"date" | "visibility" | "voice" | null>(
     null,
   );
   const [error, setError] = useState("");
+  const [conflict, setConflict] = useState<Entry | null>(null);
   const [saving, setSaving] = useState(false);
   const [online, setOnline] = useState(true);
   const [maxMB, setMaxMB] = useState(100);
@@ -154,10 +162,10 @@ export function EntryEditor({
     setForm((f) => ({ ...f, [key]: value }));
   const hasContent = Boolean(
     form.title.trim() ||
-    form.content.trim() ||
-    form.reflection.trim() ||
-    form.learning.trim() ||
-    items.length,
+      form.content.trim() ||
+      form.reflection.trim() ||
+      form.learning.trim() ||
+      items.length,
   );
   const busy = items.some(
     (i) => i.status === "uploading" || i.status === "compressing",
@@ -194,6 +202,12 @@ export function EntryEditor({
 
   useEffect(() => {
     let active = true;
+    if (!entry)
+      void readOfflineDraft()
+        .then((draft) => {
+          if (active) setOfflineDraft(draft);
+        })
+        .catch(() => {});
     readDraft(storageKey)
       .then((d) => {
         if (!active) return;
@@ -209,6 +223,12 @@ export function EntryEditor({
             ...rest
           } = d;
           setForm(rest);
+          if (
+            entry &&
+            rest.revision !== undefined &&
+            rest.revision !== entry.revision
+          )
+            setConflict(entry);
           const restoredItems = (mediaInfo || []).map(mapMedia);
           const pending = (pendingFiles || []).map((p) => ({
             key: crypto.randomUUID(),
@@ -308,10 +328,10 @@ export function EntryEditor({
   useEffect(() => {
     itemRef.current = items;
   }, [items]);
-  const latestDraft = useRef({ form, items, ready, hasContent });
+  const latestDraft = useRef({ form, items, ready, hasContent, recording });
   useEffect(() => {
-    latestDraft.current = { form, items, ready, hasContent };
-  }, [form, items, ready, hasContent]);
+    latestDraft.current = { form, items, ready, hasContent, recording };
+  }, [form, items, ready, hasContent, recording]);
   useEffect(() => {
     const flush = () => {
       const current = latestDraft.current;
@@ -323,9 +343,25 @@ export function EntryEditor({
       }
     };
     window.addEventListener("pagehide", flush);
+    const flushForUpdate = (event: Event) => {
+      const current = latestDraft.current;
+      const { waitUntil } = (
+        event as CustomEvent<{ waitUntil: (promise: Promise<unknown>) => void }>
+      ).detail;
+      if (current.recording)
+        waitUntil(
+          Promise.reject(new Error("请先结束并保留录音，再更新应用。")),
+        );
+      else if (current.ready && current.hasContent && !savedRef.current)
+        waitUntil(
+          writeDraft(storageKey, snapshotDraft(current.form, current.items)),
+        );
+    };
+    window.addEventListener("mylife:flush-drafts", flushForUpdate);
     return () => {
       flush();
       window.removeEventListener("pagehide", flush);
+      window.removeEventListener("mylife:flush-drafts", flushForUpdate);
     };
   }, [storageKey]);
   useEffect(() => {
@@ -478,6 +514,72 @@ export function EntryEditor({
       );
     }
   }
+  async function bringOfflineDraft() {
+    if (!offlineDraft || bringingDraft) return;
+    setBringingDraft(true);
+    setError("");
+    const date = offlineDraft.occurredAt;
+    const offlineText = [
+      form.content.trim() && date ? `离线记录（${date}）` : "",
+      form.title && offlineDraft.title && form.title !== offlineDraft.title
+        ? offlineDraft.title
+        : "",
+      offlineDraft.content,
+    ]
+      .filter(Boolean)
+      .join("\n");
+    const merged = {
+      ...form,
+      title: form.title || offlineDraft.title,
+      content: [form.content, offlineText].filter(Boolean).join("\n\n"),
+      visibility: "family" as const,
+      ...(!form.content.trim()
+        ? {
+            occurredAt: date || null,
+            datePrecision: date ? ("day" as const) : ("unknown" as const),
+          }
+        : {}),
+    };
+    if (merged.content.length > 50000) {
+      setError("合并后的文字超过 50000 字，请分成两条记录。");
+      setBringingDraft(false);
+      return;
+    }
+    try {
+      setForm(merged);
+      await writeDraft(storageKey, snapshotDraft(merged, items));
+      await removeOfflineDraft(offlineDraft.version);
+      setOfflineDraft(undefined);
+      setRestored(true);
+    } catch {
+      setError("暂时未能完成草稿转存，原离线草稿仍保留在设备上。");
+    } finally {
+      setBringingDraft(false);
+    }
+  }
+  async function resolveConflict(keepMine: boolean) {
+    if (!conflict || recording || saving) return;
+    const resolved = keepMine
+      ? { ...form, revision: conflict.revision, visibility: "family" as const }
+      : initial(conflict);
+    const resolvedItems = keepMine
+      ? items
+      : (conflict.media || [])
+          .filter((media): media is Media => typeof media !== "number")
+          .map(mapMedia);
+    setForm(resolved);
+    setItems(resolvedItems);
+    setError("");
+    try {
+      await writeDraft(storageKey, snapshotDraft(resolved, resolvedItems));
+      setConflict(null);
+      setDraftStatus(
+        keepMine ? "保留了你的内容，先按私密记录继续编辑" : "已载入最新版本",
+      );
+    } catch {
+      setError("设备草稿暂时无法保存，请先复制保管文字，再重试。");
+    }
+  }
   async function save(status: "draft" | "saved") {
     if (savingRef.current) return;
     if (busy) {
@@ -531,6 +633,11 @@ export function EntryEditor({
           `/entries?where[clientId][equals]=${encodeURIComponent(form.clientId)}&depth=1`,
         );
         if (!previous.docs[0]) throw e;
+        if (previous.docs[0].revision > 1)
+          throw new ApiError(
+            "这份草稿已经有保存后修改的记录。请从时间轴打开该记录后对照编辑；设备上的文字仍然保留。",
+            409,
+          );
         result = await api<{ doc: Entry }>(`/entries/${previous.docs[0].id}`, {
           method: "PATCH",
           body: JSON.stringify({
@@ -544,6 +651,11 @@ export function EntryEditor({
       if (onSaved) onSaved(result.doc);
       else router.replace(`/app/entries/${result.doc.id}?saved=1`);
     } catch (e) {
+      if (entry && e instanceof ApiError && e.status === 409) {
+        try {
+          setConflict(await api<Entry>(`/entries/${entry.id}?depth=1`));
+        } catch {}
+      }
       setError(
         e instanceof Error ? e.message : "还没有保存成功，草稿仍在此设备。",
       );
@@ -592,6 +704,56 @@ export function EntryEditor({
           <WifiOff size={17} />
           你暂时离线了，可以继续写；联网后再保存到家庭空间。
         </div>
+      )}
+      {conflict && (
+        <section className="offline-recovery" aria-label="版本冲突处理">
+          <strong>这条记录已有新版本，你正在编辑的内容仍在。</strong>
+          <details>
+            <summary>对照最新保存的内容（版本 {conflict.revision}）</summary>
+            <h3>{conflict.title || "未填写标题"}</h3>
+            <p>{conflict.content}</p>
+            <p>
+              发生时间：{displayDate(conflict)} · 附件{" "}
+              {conflict.media?.length || 0} 份 ·{" "}
+              {conflict.visibility === "public"
+                ? "所有人可见"
+                : "仅自己和家长可见"}
+            </p>
+          </details>
+          <p>
+            选择保留自己的内容后，可继续修改并再次保存，先保持私密；其他人的版本仍保留在历史中。
+          </p>
+          <div className="conflict-actions">
+            <button
+              className="secondary-button"
+              disabled={recording || saving}
+              onClick={() => void resolveConflict(true)}
+            >
+              保留我的内容，继续编辑
+            </button>
+            <button
+              className="text-button"
+              disabled={recording || saving}
+              onClick={() => void resolveConflict(false)}
+            >
+              放弃这份草稿，载入最新版本
+            </button>
+          </div>
+        </section>
+      )}
+      {offlineDraft && (
+        <section className="offline-recovery" aria-label="设备离线草稿">
+          <strong>这台设备上还有一份离线草稿</strong>
+          <p>{offlineDraft.title || offlineDraft.content.slice(0, 160)}</p>
+          <p>带回后会与当前文字合并，先保持仅自己和家长可见。</p>
+          <button
+            className="secondary-button"
+            disabled={bringingDraft}
+            onClick={() => void bringOfflineDraft()}
+          >
+            {bringingDraft ? "正在保留草稿…" : "带回编辑器"}
+          </button>
+        </section>
       )}
       {restored && (
         <div className="notice-banner">

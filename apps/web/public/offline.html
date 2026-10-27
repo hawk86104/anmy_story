@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#FFF9ED" />
+    <meta name="robots" content="noindex" />
+    <title>先把这一刻记下来 · MyLife</title>
+    <link rel="icon" href="/app-icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/offline.css" />
+    <script src="/offline-draft.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <img src="/app-icon.svg" width="80" height="80" alt="成长手记" />
+      <p class="eyebrow">A LITTLE MOMENT</p>
+      <h1>暂时离线，也能留下这一刻。</h1>
+      <p>
+        写下的文字会保存在这台设备。联网登录后，可以手动带回编辑器，再补充照片、保存或选择公开。
+      </p>
+      <form id="offline-form">
+        <label for="title">给这一刻起个名字</label
+        ><input id="title" maxlength="160" autocomplete="off" /><label
+          for="content"
+          >想记下的话</label
+        ><textarea
+          id="content"
+          rows="10"
+          maxlength="50000"
+          placeholder="今天有什么小小的发现？"
+        ></textarea
+        ><label for="occurredAt">发生日期，不确定可以留空</label
+        ><input id="occurredAt" type="date" />
+        <p id="status" role="status" aria-live="polite">正在准备设备草稿…</p>
+        <div class="actions">
+          <button type="submit">存到这台设备</button
+          ><a href="/app/new">联网后带回编辑器</a>
+        </div>
+      </form>
+      <p class="hint">共享设备上，请在完成后清除这份离线草稿。</p>
+      <button id="clear" type="button" class="quiet">清除离线草稿</button>
+      <p><a href="/app">重新连接成长空间</a></p>
+    </main>
+  </body>
+</html>

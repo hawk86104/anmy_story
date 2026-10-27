@@ -1,0 +1,98 @@
+:root {
+  color-scheme: light;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei",
+    sans-serif;
+  color: #765037;
+  background: #fff9ed;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  padding: 30px 18px;
+}
+main {
+  max-width: 680px;
+  margin: auto;
+  background: #fffefa;
+  border: 1px solid #eedfc5;
+  border-radius: 28px;
+  padding: clamp(22px, 5vw, 44px);
+}
+h1 {
+  font-size: clamp(25px, 5vw, 34px);
+  line-height: 1.5;
+}
+p {
+  line-height: 1.8;
+}
+.eyebrow {
+  font-size: 12px;
+  letter-spacing: 3px;
+}
+label {
+  display: block;
+  font-weight: 600;
+  margin: 20px 0 8px;
+}
+input,
+textarea,
+button {
+  font: inherit;
+}
+input,
+textarea {
+  width: 100%;
+  padding: 13px;
+  border: 1px solid #d9c4a8;
+  border-radius: 12px;
+  background: #fff;
+  color: inherit;
+}
+textarea {
+  resize: vertical;
+  line-height: 1.8;
+}
+button,
+.actions a {
+  display: inline-block;
+  border: 0;
+  border-radius: 24px;
+  padding: 13px 18px;
+  background: #f6ce55;
+  color: #5d3c28;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+a {
+  color: inherit;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.actions a {
+  background: #f7ecd9;
+}
+.quiet {
+  background: none;
+  border: 1px solid #d9c4a8;
+}
+.hint,
+#status {
+  font-size: 13px;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid #b2823c;
+  outline-offset: 3px;
+}
+button:disabled {
+  opacity: 0.5;
+}

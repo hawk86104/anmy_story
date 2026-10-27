@@ -18,11 +18,13 @@
     "restore": "tsx src/scripts/restore.ts"
   },
   "dependencies": {
+    "@libsql/client": "0.14.0",
     "@mylife/shared": "0.1.0",
     "@payloadcms/db-sqlite": "3.92.0",
     "@payloadcms/next": "3.92.0",
     "@payloadcms/ui": "3.92.0",
     "dotenv": "^16.6.1",
+    "drizzle-orm": "0.45.2",
     "fflate": "^0.8.3",
     "graphql": "^16.11.0",
     "next": "16.4.3",

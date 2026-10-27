@@ -19,7 +19,8 @@ const filename = url.startsWith("file://")
   ? fileURLToPath(url)
   : path.resolve(url.slice(5));
 await mkdir(path.dirname(filename), { recursive: true });
-const db = new DatabaseSync(filename);
+let db = new DatabaseSync(filename);
+let dbOpen = true;
 let savedBackup: string | undefined;
 async function ensureBackup() {
   if (savedBackup) return;
@@ -75,6 +76,10 @@ try {
     await ensureBackup();
     db.exec(`DROP TABLE "${table.replaceAll('"', '""')}";`);
   }
+  // node:sqlite and libSQL bundle separate SQLite engines. Keep their file
+  // handles disjoint, especially when the development database uses WAL.
+  db.close();
+  dbOpen = false;
   payload = await getPayload({ config });
   const adapter = payload.db as unknown as SQLiteAdapter;
   const pushSchema = adapter.requireDrizzleKit().pushSchema as unknown as (
@@ -92,6 +97,10 @@ try {
     throw new Error(
       `开发同步需要人工检查，未自动接受数据删除：${plan.warnings.join("; ")}`,
     );
+  await closePayload(payload);
+  payload = undefined;
+  db = new DatabaseSync(filename);
+  dbOpen = true;
   if (plan.statementsToExecute.length) {
     await ensureBackup();
     applyDevSchema(db, plan.statementsToExecute);
@@ -108,7 +117,7 @@ try {
   try {
     if (payload) await closePayload(payload);
   } finally {
-    db.close();
+    if (dbOpen) db.close();
   }
 }
 process.exit(0);
