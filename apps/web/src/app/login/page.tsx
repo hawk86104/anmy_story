@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, LockKeyhole, Eye, EyeOff } from "lucide-react";
 import { api } from "@/lib/api";
 import { Brand } from "@/components/brand";
+import { Usagi, themeAssets } from "@/components/theme";
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -22,7 +23,7 @@ export default function Login() {
       });
       const to = new URLSearchParams(location.search).get("next");
       router.replace(
-        to?.startsWith("/app") && !to.startsWith("//") ? to : "/app/new",
+        to?.startsWith("/app") && !to.startsWith("//") ? to : "/app",
       );
       router.refresh();
     } catch (e) {
@@ -47,19 +48,16 @@ export default function Login() {
             <br />
             这里，装着正在长大的你。
           </p>
-          <div className="orbit-art" aria-hidden="true">
-            <span className="art-sun">✳</span>
-            <span className="art-book">
-              mylife<small>我的成长手记</small>
-            </span>
-            <span className="art-star">✧</span>
-            <span className="art-leaf">◒</span>
-          </div>
+          <img
+            className="login-art"
+            src={themeAssets.banner}
+            alt="乌萨奇和朋友们一起收藏成长的记忆"
+          />
         </div>
         <small>属于你，也属于未来的你。</small>
       </div>
       <section className="login-form-card">
-        <span className="welcome-mark">✳</span>
+        <Usagi size={100} />
         <h2>欢迎回到我的小世界</h2>
         <p>用自己的账号，继续收藏成长。</p>
         <form onSubmit={submit}>

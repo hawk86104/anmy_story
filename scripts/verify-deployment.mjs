@@ -84,6 +84,22 @@ for (const doc of data.docs) {
     assert.ok(!(field in doc), `公开 API 不应返回 ${field}`);
 }
 console.log("PASS 公开快照接口");
+const profile = await request("/public/profile");
+assert.equal(profile.status, 200, "新版公开资料接口不可用，请先升级宝塔后台");
+const space = await profile.json();
+assert.ok(typeof space.displayName === "string" && space.modules);
+assert.ok(["usagi", "hachiware", "chiikawa"].includes(space.theme));
+for (const field of ["familyId", "owner", "email", "keyCipher"])
+  assert.ok(!(field in space), `公开资料不应返回 ${field}`);
+const projects = await request("/public/projects");
+assert.equal(projects.status, 200, "新版公开项目接口不可用");
+assert.ok(Array.isArray((await projects.json()).docs));
+for (const path of ["/family/space", "/family/ai", "/family/export"]) {
+  const response = await request(path);
+  assert.ok([401, 403].includes(response.status), `${path} 应拒绝匿名访问`);
+  await response.arrayBuffer();
+}
+console.log("PASS 新版主页、项目接口与家长服务、档案导出访问边界");
 console.log(
   "只读检查通过。仍需在真实手机上验收登录、20MB 以上视频上传、播放、退出与公开撤回；本脚本不修改记录。",
 );

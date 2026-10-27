@@ -1,11 +1,19 @@
 import path from "node:path";
 import sharp from "sharp";
+import { mkdir, writeFile, unlink, stat } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { Readable } from "node:stream";
+import { randomUUID } from "node:crypto";
 import type { AccessResult, CollectionConfig, Where } from "payload";
 import { APIError } from "payload";
 import { authenticated, member, relationId } from "../lib/access";
 import { publicEntryWhere } from "../lib/public-entries";
+import { mediaReferences, publicDecorativeMedia } from "../lib/media-links";
 
 export const mediaRoot = path.resolve(process.env.MEDIA_ROOT || "./media");
+export const originalsRoot = path.resolve(
+  process.env.ORIGINALS_ROOT || `${mediaRoot}-originals`,
+);
 export const Media: CollectionConfig = {
   slug: "media",
   labels: { singular: "素材", plural: "素材库" },
@@ -66,6 +74,26 @@ export const Media: CollectionConfig = {
           ? (d.media || []).map(relationId)
           : (d.publicMedia || []).map(relationId),
       );
+      ids.push(...(await publicDecorativeMedia(req)));
+      if (u?.role === "child") {
+        const projects = await req.payload.find({
+          collection: "projects",
+          where: {
+            and: [
+              { familyId: { equals: u.familyId } },
+              { owner: { equals: u.id } },
+            ],
+          },
+          depth: 0,
+          pagination: false,
+          limit: 0,
+          overrideAccess: true,
+          req,
+        });
+        ids.push(
+          ...projects.docs.map((p) => relationId(p.cover)).filter(Boolean),
+        );
+      }
       const permissions: Where[] = ids.length ? [{ id: { in: ids } }] : [];
       if (u)
         permissions.push(
@@ -109,30 +137,49 @@ export const Media: CollectionConfig = {
           overrideAccess: true,
           req,
         });
+        if (media.originalFilename)
+          req.context.deletedOriginals = {
+            ...((req.context.deletedOriginals || {}) as Record<string, string>),
+            [String(id)]: media.originalFilename,
+          };
         if (["queued", "processing"].includes(media.processingStatus || ""))
           throw new APIError(
             "视频正在排队或处理中，请等处理完成后再删除。",
             409,
           );
-        const linked = await req.payload.find({
-          collection: "entries",
-          where: {
-            or: [{ media: { in: [id] } }, { publicMedia: { in: [id] } }],
-          },
-          limit: 1,
-          depth: 0,
-          overrideAccess: true,
-          req,
-        });
-        if (linked.docs.length)
+        if (await mediaReferences(Number(id), req))
           throw new APIError(
-            "这份素材仍被成长记录使用，请先从记录中移除后再删除。",
+            "这份素材仍被成长记录使用，或用于个人主页、项目，请先移除关联后再删除。",
             409,
           );
       },
     ],
     beforeOperation: [
       async ({ args, operation, req }) => {
+        if (
+          operation === "create" &&
+          req.file &&
+          /^(image|video)\//.test(req.file.mimetype) &&
+          member(req)
+        ) {
+          const services = await req.payload.find({
+            collection: "family-services",
+            where: { familyId: { equals: member(req)!.familyId } },
+            limit: 1,
+            depth: 0,
+            overrideAccess: true,
+            req,
+          });
+          if (
+            services.docs[0]?.preserveOriginals ||
+            req.context.restoreOriginal === true
+          )
+            req.context.originalUpload = {
+              data: req.file.data,
+              name: req.file.name,
+              mimeType: req.file.mimetype,
+            };
+        }
         if (
           (operation === "create" || operation === "update") &&
           req.file &&
@@ -181,6 +228,13 @@ export const Media: CollectionConfig = {
           originalDoc?.originalSize ||
           Number(data.originalSize) ||
           req.file?.size;
+        data.preserveOriginal = !!(
+          originalDoc?.preserveOriginal || req.context.originalUpload
+        );
+        if (!context.mediaWorker) {
+          data.originalFilename = originalDoc?.originalFilename || null;
+          data.originalMimeType = originalDoc?.originalMimeType || null;
+        }
         if (!context.mediaWorker) {
           data.processingError = originalDoc?.processingError || null;
           data.processingStatus =
@@ -195,8 +249,99 @@ export const Media: CollectionConfig = {
         return data;
       },
     ],
+    afterChange: [
+      async ({ doc, operation, req }) => {
+        const original = req.context.originalUpload as
+          { data: Buffer; name: string; mimeType: string } | undefined;
+        if (operation === "create" && original) {
+          const filename = `${doc.id}-${randomUUID()}${path.extname(path.basename(original.name)).toLowerCase()}`;
+          await mkdir(originalsRoot, { recursive: true });
+          await writeFile(path.join(originalsRoot, filename), original.data, {
+            flag: "wx",
+            mode: 0o600,
+          });
+          const updated = await req.payload.update({
+            collection: "media",
+            id: doc.id,
+            data: {
+              originalFilename: filename,
+              originalMimeType: original.mimeType,
+              preserveOriginal: true,
+            },
+            overrideAccess: true,
+            context: { mediaWorker: true },
+            req,
+          });
+          return updated;
+        }
+        return doc;
+      },
+    ],
+    afterDelete: [
+      async ({ doc, req }) => {
+        const filename =
+          (
+            req.context.deletedOriginals as Record<string, string> | undefined
+          )?.[String(doc.id)] || doc.originalFilename;
+        if (filename)
+          await unlink(path.join(originalsRoot, path.basename(filename))).catch(
+            (e: NodeJS.ErrnoException) => {
+              if (e.code !== "ENOENT") throw e;
+            },
+          );
+      },
+    ],
   },
   endpoints: [
+    {
+      path: "/:id/original",
+      method: "get",
+      handler: async (req) => {
+        const u = member(req);
+        if (u?.role !== "parent")
+          return Response.json(
+            { error: "仅家长可以下载保留的原件。" },
+            { status: 403 },
+          );
+        const id = Number(req.routeParams?.id);
+        if (!Number.isSafeInteger(id) || id < 1)
+          return Response.json({ error: "无效的素材。" }, { status: 400 });
+        const docs = await req.payload.find({
+          collection: "media",
+          where: {
+            and: [{ id: { equals: id } }, { familyId: { equals: u.familyId } }],
+          },
+          depth: 0,
+          limit: 1,
+          overrideAccess: true,
+          req,
+        });
+        const m = docs.docs[0];
+        if (!m?.originalFilename)
+          return Response.json(
+            { error: "这份素材没有另存的上传原件。" },
+            { status: 404 },
+          );
+        const file = path.join(
+          originalsRoot,
+          path.basename(m.originalFilename),
+        );
+        const info = await stat(file).catch(() => null);
+        if (!info)
+          return Response.json({ error: "原件暂时不可用。" }, { status: 404 });
+        return new Response(
+          Readable.toWeb(createReadStream(file)) as ReadableStream<Uint8Array>,
+          {
+            headers: {
+              "Content-Type": m.originalMimeType || "application/octet-stream",
+              "Content-Length": String(info.size),
+              "Content-Disposition": `attachment; filename="original-${m.id}${path.extname(m.originalFilename)}"`,
+              "Cache-Control": "no-store",
+            },
+          },
+        );
+      },
+    },
     {
       path: "/:id/retry",
       method: "post",
@@ -230,6 +375,25 @@ export const Media: CollectionConfig = {
   ],
   fields: [
     { name: "alt", label: "素材说明", type: "text", maxLength: 300 },
+    {
+      name: "preserveOriginal",
+      label: "已保留上传原件",
+      type: "checkbox",
+      defaultValue: false,
+      admin: { readOnly: true },
+    },
+    {
+      name: "originalFilename",
+      type: "text",
+      admin: { hidden: true },
+      access: { read: () => false, create: () => false, update: () => false },
+    },
+    {
+      name: "originalMimeType",
+      type: "text",
+      admin: { hidden: true },
+      access: { read: () => false, create: () => false, update: () => false },
+    },
     {
       name: "imageKind",
       label: "图片用途",

@@ -1,6 +1,7 @@
 const cms = process.env.CMS_INTERNAL_URL || "http://127.0.0.1:3001";
 const directApi = Boolean(process.env.NEXT_PUBLIC_API_ORIGIN?.trim());
 export default {
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   poweredByHeader: false,
   transpilePackages: ["@mylife/shared"],
   experimental: { proxyClientMaxBodySize: "110mb" },

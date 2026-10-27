@@ -1,5 +1,5 @@
 import type { Media } from "@mylife/shared";
-import { ApiError } from "./api";
+import { api, ApiError } from "./api";
 import { apiUrl } from "./urls";
 export async function compressImage(
   file: File,
@@ -33,6 +33,11 @@ export async function compressImage(
   } finally {
     bitmap.close();
   }
+}
+export async function prepareImage(file: File, document: boolean) {
+  if (!file.type.startsWith("image/")) return file;
+  const policy = await api<{ preserveOriginals: boolean }>("/capabilities");
+  return policy.preserveOriginals ? file : compressImage(file, document);
 }
 export function uploadMedia(
   file: File,

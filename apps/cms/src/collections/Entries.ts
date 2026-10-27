@@ -7,6 +7,7 @@ import {
   resolvePublication,
   validateEntry,
 } from "../lib/entry-policy";
+import { verifiedOriginal } from "../lib/ai-proof";
 
 export const Entries: CollectionConfig = {
   slug: "entries",
@@ -61,22 +62,124 @@ export const Entries: CollectionConfig = {
         const merged = { ...originalDoc, ...data };
         validateEntry(merged);
         data.content = String(merged.content || "");
-        data.createdAt = originalDoc?.createdAt || new Date().toISOString();
+        const restoring =
+          req.context.restoreArchive === true && u.role === "parent";
+        data.createdAt =
+          originalDoc?.createdAt ||
+          (restoring &&
+          data.createdAt &&
+          Number.isFinite(Date.parse(data.createdAt))
+            ? data.createdAt
+            : new Date().toISOString());
         data.familyId = originalDoc?.familyId || u.familyId;
         data.author = originalDoc?.author
           ? relationId(originalDoc.author)
           : u.id;
+        if (restoring && !originalDoc?.id && relationId(data.author)) {
+          const author = await req.payload.find({
+            collection: "users",
+            where: {
+              and: [
+                {
+                  id: {
+                    equals: relationId(
+                      (req.context.entryIntent as Record<string, unknown>)
+                        ?.author,
+                    ),
+                  },
+                },
+                { familyId: { equals: u.familyId } },
+              ],
+            },
+            limit: 1,
+            depth: 0,
+            overrideAccess: true,
+            req,
+          });
+          if (author.docs[0]) data.author = author.docs[0].id;
+        }
         data.editedBy = u.id;
         data.editorName = u.name;
         data.originalText =
           originalDoc?.originalText ?? String(data.content || "");
-        data.revision = (originalDoc?.revision || 0) + 1;
+        if (
+          restoring &&
+          !originalDoc?.id &&
+          typeof (req.context.entryIntent as Record<string, unknown>)
+            ?.originalText === "string"
+        )
+          data.originalText = String(
+            (req.context.entryIntent as Record<string, unknown>).originalText,
+          ).slice(0, 50000);
+        const originalToken = (
+          req.context.entryIntent as Record<string, unknown> | undefined
+        )?.aiOriginalToken;
+        if (!originalDoc?.id && typeof originalToken === "string")
+          data.originalText = verifiedOriginal(
+            originalToken,
+            u.id,
+            u.familyId,
+            String(data.clientId || ""),
+          );
+        data.revision =
+          restoring &&
+          !originalDoc?.id &&
+          Number.isSafeInteger(data.revision) &&
+          data.revision > 0
+            ? data.revision
+            : (originalDoc?.revision || 0) + 1;
         data.clientId = originalDoc?.clientId || data.clientId;
         data.occurredAt = normalizeDate(
           merged.occurredAt,
           merged.datePrecision,
         );
         const ids = (merged.media || []).map(relationId);
+        const coverId = relationId(merged.coverMedia);
+        if (coverId && !ids.includes(coverId))
+          throw new APIError("封面需要从这条记录的附件中选择。", 400);
+        if (coverId) {
+          const cover = await req.payload.findByID({
+            collection: "media",
+            id: coverId,
+            overrideAccess: false,
+            user: req.user,
+            req,
+            depth: 0,
+          });
+          if (!cover.mimeType?.startsWith("image/"))
+            throw new APIError("请选择照片作为封面。", 400);
+        }
+        const projectIds = [
+          ...new Set(
+            [
+              ...(merged.projects || []).map(relationId),
+              relationId(merged.mainProject),
+            ].filter(Boolean),
+          ),
+        ];
+        if (projectIds.length > 8)
+          throw new APIError("每条记录最多关联 8 个成长项目。", 400);
+        if (projectIds.length) {
+          const projects = await req.payload.find({
+            collection: "projects",
+            where: {
+              and: [
+                { id: { in: projectIds } },
+                { familyId: { equals: u.familyId } },
+              ],
+            },
+            depth: 0,
+            limit: 8,
+            overrideAccess: false,
+            user: req.user,
+            req,
+          });
+          if (projects.docs.length !== projectIds.length)
+            throw new APIError("部分成长项目不可访问，请重新选择。", 403);
+        }
+        data.projects = projectIds;
+        data.mainProject = relationId(merged.mainProject) || null;
+        data.coverMedia = coverId || null;
         if (ids.length) {
           const media = await req.payload.find({
             collection: "media",
@@ -125,11 +228,49 @@ export const Entries: CollectionConfig = {
                 label: tag.label,
               })),
               media: ids,
+              coverMedia: coverId || null,
+              projects: projectIds,
+              mainProject: data.mainProject,
               revision: data.revision,
             }
           : null;
         data.publicMedia = data.publicSnapshot?.media || [];
         return data;
+      },
+    ],
+    afterChange: [
+      async ({ doc, req }) => {
+        const versionKey = `${doc.id}:${doc.revision}`;
+        const existing = await req.payload.find({
+          collection: "entry-history",
+          where: { versionKey: { equals: versionKey } },
+          depth: 0,
+          limit: 1,
+          overrideAccess: true,
+          req,
+        });
+        if (!existing.docs.length)
+          await req.payload.create({
+            collection: "entry-history",
+            data: {
+              versionKey,
+              entry: doc.id,
+              revision: doc.revision,
+              familyId: doc.familyId,
+              author: relationId(doc.author),
+              editorName: doc.editorName,
+              snapshot: {
+                ...doc,
+                media: (doc.media || []).map(relationId),
+                coverMedia: relationId(doc.coverMedia) || null,
+                projects: (doc.projects || []).map(relationId),
+                mainProject: relationId(doc.mainProject) || null,
+              },
+            },
+            overrideAccess: true,
+            req,
+          });
+        return doc;
       },
     ],
   },
@@ -219,6 +360,26 @@ export const Entries: CollectionConfig = {
         { label: "已保存", value: "saved" },
         { label: "已归档", value: "archived" },
       ],
+    },
+    {
+      name: "coverMedia",
+      label: "记录封面",
+      type: "relationship",
+      relationTo: "media",
+    },
+    {
+      name: "projects",
+      label: "相关成长项目",
+      type: "relationship",
+      relationTo: "projects",
+      hasMany: true,
+      maxRows: 8,
+    },
+    {
+      name: "mainProject",
+      label: "主要成长项目",
+      type: "relationship",
+      relationTo: "projects",
     },
     {
       name: "visibility",

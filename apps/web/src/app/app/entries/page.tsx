@@ -11,7 +11,12 @@ import {
   ChevronDown,
   LoaderCircle,
 } from "lucide-react";
-import { ENTRY_TYPES, entryTitle, displayDate } from "@mylife/shared";
+import {
+  ENTRY_TYPES,
+  entryTitle,
+  displayDate,
+  entryCover,
+} from "@mylife/shared";
 import type { Entry } from "@mylife/shared";
 import { api } from "@/lib/api";
 import { mediaUrl } from "@/lib/urls";
@@ -19,6 +24,7 @@ export default function Timeline() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [type, setType] = useState("all");
   const [status, setStatus] = useState("saved");
+  const [visibility, setVisibility] = useState("");
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -44,6 +50,7 @@ export default function Timeline() {
       "where[status][equals]": status,
     });
     if (type !== "all") p.set("where[type][equals]", type);
+    if (visibility) p.set("where[visibility][equals]", visibility);
     if (search) {
       p.set("where[or][0][title][contains]", search);
       p.set("where[or][1][content][contains]", search);
@@ -63,7 +70,7 @@ export default function Timeline() {
     return () => {
       active = false;
     };
-  }, [type, search, page, status]);
+  }, [type, search, page, status, visibility]);
   const groups = entries.reduce<Record<string, Entry[]>>((acc, e) => {
     const key =
       e.datePrecision === "unknown" || !e.occurredAt
@@ -115,6 +122,21 @@ export default function Timeline() {
           </select>
           <ChevronDown size={15} />
         </label>
+        <label className="status-select">
+          <select
+            aria-label="可见范围"
+            value={visibility}
+            onChange={(e) => {
+              setVisibility(e.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">全部可见范围</option>
+            <option value="family">仅自己和家长可见</option>
+            <option value="public">所有人可见</option>
+          </select>
+          <ChevronDown size={15} />
+        </label>
       </div>
       <div className="filter-pills">
         <button
@@ -159,10 +181,7 @@ export default function Timeline() {
               </h2>
               <div className="timeline-track">
                 {group.map((e) => {
-                  const photo = e.media?.find(
-                    (m) =>
-                      typeof m !== "number" && m.mimeType?.startsWith("image/"),
-                  );
+                  const photo = entryCover(e);
                   return (
                     <Link
                       href={`/app/entries/${e.id}`}

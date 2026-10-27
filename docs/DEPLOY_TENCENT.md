@@ -1,18 +1,20 @@
 # Ubuntu 22.04 宝塔 + EdgeOne Pages 部署
 
-本部署适配分支：`deploy/tencent-edgeone-baota`。合并到 `main` 后按本文部署；合并前可检出此分支测试。下列域名按本次确定的值配置。
+当前部署采用 EdgeOne Pages 前台 + 宝塔后台。你的 EO 生产分支为 `master`，本文按此说明；本地分支叫 `main` 时，需要把最终提交合入或推送到实际监听的 `master` 才会触发生产发布。
 
-| 部分               | 地址 / 位置                                        |
-| ------------------ | -------------------------------------------------- |
-| 前台与手机记录界面 | `https://anmy.icegl.cn`，EdgeOne Pages             |
-| 后台 REST API      | `https://story.icegl.cn/api`，Ubuntu 宝塔服务器    |
-| 家长后台           | `https://story.icegl.cn/admin`                     |
-| 数据库             | SQLite，`/www/server-data/anmy_story/db/mylife.db` |
-| 图片、视频、录音   | `/www/server-data/anmy_story/media`                |
+已经部署成功后的版本更新，直接看[第 9 节](#9-已部署站点的版本更新与回滚)。不要重新初始化数据库或账号。
+
+| 部分               | 地址 / 位置                                     |
+| ------------------ | ----------------------------------------------- |
+| 前台与手机记录界面 | `https://anmy.icegl.cn`，EdgeOne Pages          |
+| 后台 REST API      | `https://story.icegl.cn/api`，Ubuntu 宝塔服务器 |
+| 家长后台           | `https://story.icegl.cn/admin`                  |
+| 数据库             | SQLite，`/www/wwwroot/anmy_story/db/mylife.db`  |
+| 图片、视频、录音   | `/www/wwwroot/anmy_story/media`                 |
 
 ## 1. 这套部署的数据和请求走向
 
-GitHub `main` 更新 → EdgeOne Pages 自动构建前台。
+GitHub `master` 更新 → EdgeOne Pages 自动构建前台。宝塔后台与数据库需要单独更新。
 
 浏览器打开 `anmy.icegl.cn`；登录、记录、文件上传与媒体播放直接访问 `story.icegl.cn`。宝塔 Nginx 把后台请求转发给本机 `127.0.0.1:3001`，Payload 读写 SQLite 与素材目录。另一个后台进程执行 FFmpeg 视频处理。
 
@@ -53,25 +55,26 @@ git clone git@github.com:hawk86104/anmy_story.git /www/wwwroot/anmy_story
 cd /www/wwwroot/anmy_story
 npm ci
 
-mkdir -p /www/server-data/anmy_story/db
-mkdir -p /www/server-data/anmy_story/media
-mkdir -p /www/server-data/anmy_story/backups
+mkdir -p /www/wwwroot/anmy_story/db
+mkdir -p /www/wwwroot/anmy_story/media
+mkdir -p /www/wwwroot/anmy_story/backups
 
 # 首次部署创建配置；-n 不覆盖已经存在的 .env。
 cp -n deploy/tencent/cms.env.example apps/cms/.env
 chmod 600 apps/cms/.env
 ```
 
-数据库和媒体目录的读写权限要授予运行 CMS / 视频进程的同一部署用户。宝塔面板若选择 `www` 用户运行，目录所有者也应与之对应。代码更新或重新构建不应删除 `/www/server-data/anmy_story`。
+数据库和媒体目录的读写权限要授予运行 CMS / 视频进程的同一部署用户。宝塔面板若选择 `www` 用户运行，目录所有者也应与之对应。代码更新或重新构建不应删除 `/www/wwwroot/anmy_story`。
 
 打开 `apps/cms/.env` 填写：
 
 ```dotenv
 NODE_ENV=production
 PAYLOAD_SECRET=填入一次生成的随机密钥
-DATABASE_URL=file:/www/server-data/anmy_story/db/mylife.db
-MEDIA_ROOT=/www/server-data/anmy_story/media
-MEDIA_WORKER_LOCK=/www/server-data/anmy_story/media-worker.lock
+DATABASE_URL=file:/www/wwwroot/anmy_story/db/mylife.db
+MEDIA_ROOT=/www/wwwroot/anmy_story/media
+ORIGINALS_ROOT=/www/wwwroot/anmy_story/media-originals
+MEDIA_WORKER_LOCK=/www/wwwroot/anmy_story/media-worker.lock
 WEB_ORIGIN=https://anmy.icegl.cn
 CMS_ORIGIN=https://story.icegl.cn
 MAX_UPLOAD_MB=100
@@ -123,7 +126,7 @@ curl -f http://127.0.0.1:3001/api/health
 
 在宝塔创建 `story.icegl.cn` 站点，申请并启用 HTTPS。应用统一反向代理到 `http://127.0.0.1:3001`，保留宝塔证书验证与续期配置。参考 [Nginx 配置片段](../deploy/tencent/nginx-cms.conf)：上传上限设为 110MB，请求正文与转发超时覆盖上传过程。
 
-这个后台站点不启用静态扩展名缓存规则，不把素材目录直接映射成公开静态路径。`/api`、媒体文件和 `/admin` 都由 Payload / Next.js 提供。数据库目录始终在网站目录之外。Nginx 配置完成后，运行宝塔的配置检查并重载 Nginx。
+这个后台站点不启用静态扩展名缓存规则，不把素材目录直接映射成公开静态路径。`/api`、媒体文件和 `/admin` 都由 Payload / Next.js 提供。数据库与素材不配置为可直读的静态目录。Nginx 配置完成后，运行宝塔的配置检查并重载 Nginx。
 
 对外验证：
 
@@ -135,7 +138,7 @@ curl -f https://story.icegl.cn/api/health
 
 ## 7. 再配置 EdgeOne Pages 前台
 
-在 EO 的 **Pages 项目**里授权访问私有仓库 `hawk86104/anmy_story`，生产分支选 `main`。这是 Pages 的 Git 集成；单独添加普通 EO 加速站点不会自动拉取 GitHub 构建。
+在 EO 的 **Pages 项目**里授权访问私有仓库 `hawk86104/anmy_story`，生产分支选你当前使用的 `master`。这是 Pages 的 Git 集成；单独添加普通 EO 加速站点不会自动拉取 GitHub 构建。
 
 | 配置项   | 值                                                                  |
 | -------- | ------------------------------------------------------------------- |
@@ -189,22 +192,179 @@ node scripts/verify-deployment.mjs \
 
 这些检查通过后，再把正式入口交给孩子长期使用。
 
-## 9. 以后的自动发布与备份
+## 9. 已部署站点的版本更新与回滚
 
-前台：合并到 `main` 后，由 EO Git 集成自动部署。GitHub CI 和 EO 的 Git 构建默认各自触发；CI 全绿不会自动成为 EO 发布的门禁。建议把 `main` 配置为需 PR 和通过 CI 才能合并。
+### 9.1 哪部分会自动更新
 
-后台：EO 不会自动更新宝塔上的 Node 进程。初期先手动维护，涉及表结构或 API 改动时先备份、部署兼容后台，再发布依赖新接口的前台；后续可单独接 GitHub Actions 的受控服务器发布。
+| 变更                                                                   | 更新位置           | 是否由 EO 自动完成                     |
+| ---------------------------------------------------------------------- | ------------------ | -------------------------------------- |
+| 首页、时间轴、作品、主题素材、孩子记录界面、`/app/manage` 手机管理界面 | EdgeOne `apps/web` | 推送到已监听的 `master` 后自动构建发布 |
+| Payload `/admin`、认证、REST API、AI 调用、视频处理                    | 宝塔 `apps/cms`    | 否，需要拉代码、安装依赖、构建并重启   |
+| SQLite 表结构与现有历史转存                                            | 宝塔数据库         | 否，需要执行随版本提交的迁移           |
+| 正文、用户、照片、视频、录音、上传原件                                 | 宝塔持久目录       | 保留原目录；不从 Git 或 EO 覆盖        |
 
-更新时保留正式 `.env`、密钥和所有 `/www/server-data/anmy_story` 文件。先暂停后台和媒体进程，做一次数据库与素材的一致备份，再拉取已审核代码、`npm ci`、执行迁移、构建 CMS、重启两个进程。代码回滚不代表数据库迁移自动回滚。
+因此前台通常不需要手工上传，但仍要确认 EO 构建成功、生产提交正确、接口可用。`master` 是你当前实际监听的分支，不要仅更新本地 `main` 就认为生产已发布。GitHub CI 和 EO 各自触发，CI 成功不是 EO 的自动发布门禁。
 
-定期备份数据库、媒体目录，以及单独保存的正式密钥/配置。SQLite 可用 `.backup` 创建一致数据库副本；如果需要整套数据和媒体的一致快照，应暂停写入再备份，之后验证可恢复。
+### 9.2 这次乌萨奇版本的发布顺序
 
-目前媒体保存在服务器磁盘。接入腾讯云 COS 是下一步独立工作，需要存储适配器及私人文件授权，不能直接照普通公开博客把整个桶设为公共读取。
+这次新增了成长主页、项目、长期历史、家庭服务设置，记录增加封面与项目关系，素材增加原件信息；迁移文件为 `20261026_085202_usagi_theme`。原账号和成长内容继续使用，不运行 `setup`、`seed` 或数据库重置。
+
+先让宝塔后台支持新接口，再发布依赖它的前台。你已经监听 `master`，本轮可按下列顺序操作：
+
+1. 在 EO 项目暂时关闭生产环境的自动部署；旧的成功部署继续服务。不同控制台版本的开关位于 Git 管理或环境管理中。
+2. 将已经验证的本次代码提交推送到 `master`，记下提交 SHA。
+3. 按 9.3～9.5 升级宝塔，并验证新接口。
+4. 在 EO 针对同一提交重新部署前台，检查成功后恢复自动部署；完成 9.6 的验收。
+
+另一种做法是先把提交推到发布分支，宝塔按该提交升级；后台验收通过后再合入 `master`，由 EO 自动发布。纯前端样式更新且接口兼容时，可以直接保留自动部署流程。
+
+### 9.3 宝塔：核对现有路径，停机备份
+
+在宝塔终端使用管理现有 PM2 进程的同一个 Linux 用户，切到原项目目录。逐段执行，任何报错先停止处理，不继续后面的迁移和重启。
+
+```bash
+# 后续同一会话中，任一命令报错即停止，先处理错误再继续。
+set -e
+cd /www/wwwroot/anmy_story
+node --version
+pm2 status
+git status --short
+git branch --show-current
+git rev-parse HEAD
+git fetch origin master
+git log -1 --oneline origin/master
+
+# 只查看持久目录配置，不输出认证密钥或初始化密码。
+grep -E '^(DATABASE_URL|MEDIA_ROOT|ORIGINALS_ROOT|MEDIA_WORKER_LOCK)=' apps/cms/.env
+```
+
+Node 应为 `v24.18.0`。如果 Git 显示服务器上有已跟踪文件的本地修改，先保留并合并这些修改，不使用强制重置。后续示例按你当前的 `/www/wwwroot/anmy_story` 路径填写；如果现有 `.env` 指向别处，以真实路径为准，调整下面的变量，**不更改现有 DATABASE_URL 来迁就示例**。
+
+```bash
+# 以下变量在同一个终端会话中继续使用。
+DB=/www/wwwroot/anmy_story/db/mylife.db
+MEDIA=/www/wwwroot/anmy_story/media
+ORIGINALS=/www/wwwroot/anmy_story/media-originals
+BACKUP=/www/backup/anmy_story/$(date +%Y%m%d-%H%M%S)
+
+# 停止写入与视频处理后，备份数据库、文件、配置和旧提交。
+pm2 stop anmy-cms anmy-media
+umask 077
+mkdir -p "$BACKUP/db"
+git rev-parse HEAD > "$BACKUP/code-commit.txt"
+cp -a apps/cms/.env "$BACKUP/cms.env"
+
+test -f "$DB" || { echo '数据库路径不存在，停止更新'; exit 1; }
+sqlite3 "$DB" ".backup '$BACKUP/db/mylife.db'"
+test "$(sqlite3 "$BACKUP/db/mylife.db" 'PRAGMA quick_check;')" = ok || { echo '备份校验失败，停止更新'; exit 1; }
+cp -a "$MEDIA" "$BACKUP/media"
+if [ -d "$ORIGINALS" ]; then cp -a "$ORIGINALS" "$BACKUP/media-originals"; fi
+printf '备份完成：%s\n' "$BACKUP"
+```
+
+如果自定义了 `ORIGINALS_ROOT`，上面的 ORIGINALS 也要一致；未配置时默认是 MEDIA_ROOT 加 `-originals`。第一次从旧版升级时没有原件目录是正常情况。备份放在站点之外，包含私密家庭文件和后台密钥，应另存一份并限制访问。仅复制正在写入的 `.db`，或仅备份 Git，都不构成完整备份。
+
+### 9.4 宝塔：拉代码、安装依赖、迁移、构建
+
+确认刚才的备份完成，仍在项目根目录，执行：
+
+```bash
+git pull --ff-only origin master
+git rev-parse HEAD
+npm ci
+
+# NODE_ENV=production 禁止开发模式的自动结构 push。
+NODE_ENV=production npm run db:migrate --workspace @mylife/cms
+
+# 这里只构建宝塔后台；前台由 EO 构建。
+npm run build --workspace @mylife/cms
+```
+
+核对拉取后的 SHA 与准备发布到 EO 的提交一致。迁移日志应包含 `Migrated: 20261026_085202_usagi_theme`；已经执行过的迁移会被跳过，`payload_migrations` 记录执行状态。生产库不要运行 `db:migrate:create`、`migrate:fresh`、`migrate:reset` 或开发服务器。
+
+这次迁移增加表和字段，不删除旧记录；还会转存数据库中目前仍存在的原生历史版本。此前已经被 100 版滚动上限删除的旧历史不能凭空恢复。首次登录后生成默认成长主页，之后可在“我的资料 / 主题”中设置公开称呼、头像与封面。
+
+**现有 `.env`、PAYLOAD_SECRET、数据库和媒体保持原值、原位置。** 不复制本地 `.env` 或本地测试库到服务器，不用模板覆盖正式配置。PAYLOAD_SECRET 还用于加密新版本的 AI 密钥，重新随机生成会使登录失效且已有 AI 密钥无法解密。
+
+本轮无需新增必填配置。若希望明确指定上传原件目录，可只追加这一项，路径所有者与 PM2 用户一致：
+
+```dotenv
+ORIGINALS_ROOT=/www/wwwroot/anmy_story/media-originals
+```
+
+AI 与原件保留均默认关闭。通过手机家长端 `/app/manage/ai` 配置实际服务地址、模型、密钥并授权后才可主动调用；不把 AI 密钥写到 EO。开启“保留原件”仅影响之后的新上传，不能找回旧版已经清理的原件。
+
+### 9.5 宝塔：重启并验证接口
+
+只有迁移和构建都成功后才启动服务：
+
+```bash
+pm2 restart deploy/tencent/ecosystem.config.cjs --update-env
+pm2 status
+pm2 logs anmy-cms --lines 40 --nostream
+pm2 logs anmy-media --lines 40 --nostream
+curl -f http://127.0.0.1:3001/api/health
+curl -f https://story.icegl.cn/api/health
+curl -f https://story.icegl.cn/api/public/profile
+curl -f 'https://story.icegl.cn/api/public/projects?limit=1'
+pm2 save
+```
+
+两个进程都应为 online；后两个接口返回 JSON，空项目列表也正常。已有的 Nginx 反代、域名和 HTTPS 通常不需要重配。本次 AI 请求最长 90 秒、ZIP 流式导出使用现有 300 秒代理读取超时；不要给后台 API 和下载接口加 CDN 强制缓存。整个服务继续使用一个 CMS 实例，不启用 PM2 cluster。
+
+数据库、备份、上传原件和 `.env` 不应直接暴露为网站静态文件。你目前把数据放在仓库路径下，需保留“全路径代理给 Node、无媒体 alias、无静态扩展名直读”的站点配置；不要用宝塔的静态目录浏览来提供这些文件。
+
+### 9.6 EdgeOne：发布同一提交并验收
+
+原有安装 / 构建设置保持第 7 节的值。前台环境变量仍为：
+
+```dotenv
+NEXT_PUBLIC_API_ORIGIN=https://story.icegl.cn
+NEXT_PUBLIC_CMS_ADMIN_URL=https://story.icegl.cn/admin
+CMS_INTERNAL_URL=https://story.icegl.cn
+```
+
+在 EO 对这次 `master` 的同一提交重新部署，确认成功、绑定域名仍为 `anmy.icegl.cn`，再恢复生产自动部署。更改 `NEXT_PUBLIC_*` 后需要重新构建；不需要向 EO 上传数据库、媒体或后台密钥。
+
+在仓库根目录执行只读检查：
+
+```bash
+node scripts/verify-deployment.mjs \
+  --api-origin https://story.icegl.cn \
+  --web-origin https://anmy.icegl.cn
+```
+
+然后在真实手机检查：
+
+- 旧账号可登录，旧记录、素材和最初表达仍在；编辑旧记录后能查看历史。
+- 公开首页、时间轴、作品、里程碑与项目可打开；私密记录仍不出现在公开页面。
+- 保存一条测试记录，选择封面与项目，刷新后仍在；公开后游客能看，撤回后游客不能看。
+- 家长能进入 `/app/manage`，查看成员、素材、主题和版本；孩子不能进入家长管理功能。
+- 视频排队后能完成播放，家长能下载家庭档案 ZIP 并检查 `missing-files.json`。
+
+家庭内容变更由动态 API / SSR 获取，普通写记录不需要再次提交 Git 或重建 EO。AI 未配置真实服务时保持关闭；“程序测试通过”不代表你的付费服务或手机录音权限已经验收。
+
+### 9.7 更新失败与回滚
+
+若安装、迁移或构建失败，先保留错误日志和本轮备份，暂不发布 EO 新前台。迁移失败时不要继续重启新程序；先检查迁移记录和 SQLite 完整性，再决定修复或恢复。
+
+代码回退不会自动回退数据库。尤其不要直接执行这次迁移的 down 来恢复生产，它会删除新表。需要整套回滚且确认可以放弃升级后新增内容时：
+
+1. 停止两个 PM2 进程，并把当前数据库、可能存在的 `-wal` / `-shm` 文件、媒体和原件再备份到另一个目录，保留故障现场。
+2. 从 `$BACKUP/code-commit.txt` 确认旧提交。保留服务器本地修改后检出旧提交，使用该提交执行 `npm ci`。
+3. 把当前数据库及其 `-wal` / `-shm` 一并移出原目录，再将 `$BACKUP/db/mylife.db` 复制回原 DATABASE_URL；按同一份备份恢复媒体、原件和正式配置，避免把旧库与新文件混用。
+4. 以旧代码重新构建 CMS，重启 PM2；验证旧记录和媒体。EO 切回对应的旧成功部署或重新部署旧提交。
+
+若升级后已经产生新记录，先保存新数据，优先修复问题；直接用旧备份覆盖会丢失这些新内容。日常家庭 ZIP 可用于独立家庭内容恢复，命令见 [乌萨奇版本说明](USAGI_ITERATION.md)，它不包含密码和 AI 凭据，不能替代服务器数据库、文件和密钥的一致备份。
+
+目前媒体保存在服务器磁盘。COS、自动服务器发布和定时异地备份仍是独立后续工作。
 
 ## 官方依据
 
 - [EO Pages Next.js 支持与 rewrites 限制](https://pages.edgeone.ai/document/framework-nextjs)
 - [EO 构建指南与 .nvmrc](https://edgeone.cloud.tencent.com/pages/document/162936788693114880)
 - [EO 函数请求体限制](https://pages.edgeone.ai/document/limits-and-quotas)
+- [EO 生产分支与自动触发部署](https://edgeone.cloud.tencent.com/pages/document/162936814287618048)
+- [Payload 生产迁移](https://payloadcms.com/docs/database/migrations)
 
-本次未连接宝塔、未修改 DNS、未创建或发布真实 EO 项目。上述外部状态要在目标环境操作后验证。
+你已确认首版在宝塔部署成功。本次实现与迁移在本地隔离环境验证，未连接你的宝塔或 EO 控制台，也未替你更新生产数据。更新后的真实线上状态仍需按本文验收。

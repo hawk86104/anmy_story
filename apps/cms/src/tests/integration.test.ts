@@ -759,7 +759,7 @@ test(
         async () => {
           const run = promisify(execFile);
           const input = path.join(temp, "sample.mp4");
-          await run("ffmpeg", [
+          await run(process.env.FFMPEG_PATH || "ffmpeg", [
             "-y",
             "-f",
             "lavfi",
@@ -809,7 +809,7 @@ test(
           const output = path.join(temp, "media", processed.filename!);
           const probe = JSON.parse(
             (
-              await run("ffprobe", [
+              await run(process.env.FFPROBE_PATH || "ffprobe", [
                 "-v",
                 "error",
                 "-show_streams",

@@ -70,6 +70,10 @@ export interface Config {
     users: User;
     entries: Entry;
     media: Media;
+    spaces: Space;
+    projects: Project;
+    'entry-history': EntryHistory;
+    'family-services': FamilyService;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -80,6 +84,10 @@ export interface Config {
     users: UsersSelect<false> | UsersSelect<true>;
     entries: EntriesSelect<false> | EntriesSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
+    spaces: SpacesSelect<false> | SpacesSelect<true>;
+    projects: ProjectsSelect<false> | ProjectsSelect<true>;
+    'entry-history': EntryHistorySelect<false> | EntryHistorySelect<true>;
+    'family-services': FamilyServicesSelect<false> | FamilyServicesSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -177,6 +185,9 @@ export interface Entry {
     | null;
   media?: (number | Media)[] | null;
   status: 'draft' | 'saved' | 'archived';
+  coverMedia?: (number | null) | Media;
+  projects?: (number | Project)[] | null;
+  mainProject?: (number | null) | Project;
   visibility: 'family' | 'public';
   publicRequested?: boolean | null;
   reviewStatus?: ('none' | 'pending' | 'approved' | 'rejected') | null;
@@ -208,6 +219,9 @@ export interface Entry {
 export interface Media {
   id: number;
   alt?: string | null;
+  preserveOriginal?: boolean | null;
+  originalFilename?: string | null;
+  originalMimeType?: string | null;
   imageKind?: ('photo' | 'document') | null;
   familyId: string;
   owner?: (number | null) | User;
@@ -225,6 +239,101 @@ export interface Media {
   height?: number | null;
   focalX?: number | null;
   focalY?: number | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "projects".
+ */
+export interface Project {
+  id: number;
+  title: string;
+  summary?: string | null;
+  description?: string | null;
+  startedAt?: string | null;
+  status: 'exploring' | 'completed';
+  visibility: 'family' | 'public';
+  cover?: (number | null) | Media;
+  familyId: string;
+  owner: number | User;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "spaces".
+ */
+export interface Space {
+  id: number;
+  familyId: string;
+  owner: number | User;
+  displayName: string;
+  bio?: string | null;
+  interests?:
+    | {
+        label: string;
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * 选择后，游客可以查看这张头像。
+   */
+  avatar?: (number | null) | Media;
+  /**
+   * 留空使用主题插画；选择的照片会公开。
+   */
+  cover?: (number | null) | Media;
+  theme: 'usagi' | 'hachiware' | 'chiikawa';
+  modules?: {
+    timeline?: boolean | null;
+    works?: boolean | null;
+    honors?: boolean | null;
+    projects?: boolean | null;
+  };
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "entry-history".
+ */
+export interface EntryHistory {
+  id: number;
+  versionKey: string;
+  entry: number | Entry;
+  revision: number;
+  familyId: string;
+  author: number | User;
+  editorName?: string | null;
+  snapshot:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "family-services".
+ */
+export interface FamilyService {
+  id: number;
+  familyId: string;
+  enabled?: boolean | null;
+  endpoint?: string | null;
+  model?: string | null;
+  transcriptionModel?: string | null;
+  keyCipher?: string | null;
+  consent?: boolean | null;
+  consentAt?: string | null;
+  preserveOriginals?: boolean | null;
+  lastExportAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -261,6 +370,22 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'media';
         value: number | Media;
+      } | null)
+    | ({
+        relationTo: 'spaces';
+        value: number | Space;
+      } | null)
+    | ({
+        relationTo: 'projects';
+        value: number | Project;
+      } | null)
+    | ({
+        relationTo: 'entry-history';
+        value: number | EntryHistory;
+      } | null)
+    | ({
+        relationTo: 'family-services';
+        value: number | FamilyService;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -355,6 +480,9 @@ export interface EntriesSelect<T extends boolean = true> {
       };
   media?: T;
   status?: T;
+  coverMedia?: T;
+  projects?: T;
+  mainProject?: T;
   visibility?: T;
   publicRequested?: T;
   reviewStatus?: T;
@@ -375,6 +503,9 @@ export interface EntriesSelect<T extends boolean = true> {
  */
 export interface MediaSelect<T extends boolean = true> {
   alt?: T;
+  preserveOriginal?: T;
+  originalFilename?: T;
+  originalMimeType?: T;
   imageKind?: T;
   familyId?: T;
   owner?: T;
@@ -392,6 +523,85 @@ export interface MediaSelect<T extends boolean = true> {
   height?: T;
   focalX?: T;
   focalY?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "spaces_select".
+ */
+export interface SpacesSelect<T extends boolean = true> {
+  familyId?: T;
+  owner?: T;
+  displayName?: T;
+  bio?: T;
+  interests?:
+    | T
+    | {
+        label?: T;
+        id?: T;
+      };
+  avatar?: T;
+  cover?: T;
+  theme?: T;
+  modules?:
+    | T
+    | {
+        timeline?: T;
+        works?: T;
+        honors?: T;
+        projects?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "projects_select".
+ */
+export interface ProjectsSelect<T extends boolean = true> {
+  title?: T;
+  summary?: T;
+  description?: T;
+  startedAt?: T;
+  status?: T;
+  visibility?: T;
+  cover?: T;
+  familyId?: T;
+  owner?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "entry-history_select".
+ */
+export interface EntryHistorySelect<T extends boolean = true> {
+  versionKey?: T;
+  entry?: T;
+  revision?: T;
+  familyId?: T;
+  author?: T;
+  editorName?: T;
+  snapshot?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "family-services_select".
+ */
+export interface FamilyServicesSelect<T extends boolean = true> {
+  familyId?: T;
+  enabled?: T;
+  endpoint?: T;
+  model?: T;
+  transcriptionModel?: T;
+  keyCipher?: T;
+  consent?: T;
+  consentAt?: T;
+  preserveOriginals?: T;
+  lastExportAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

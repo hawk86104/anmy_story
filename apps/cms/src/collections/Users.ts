@@ -37,11 +37,27 @@ export const Users: CollectionConfig = {
   },
   hooks: {
     beforeChange: [
-      ({ data, req, originalDoc, context }) => {
+      async ({ data, req, originalDoc, context }) => {
         if (context.bootstrap) return data;
         const u = member(req);
         if (!u) throw new APIError("请先登录。", 401);
         data.familyId = originalDoc?.familyId || u.familyId;
+        if (originalDoc?.role === "parent" && data.role === "child") {
+          const parents = await req.payload.count({
+            collection: "users",
+            where: {
+              and: [
+                { familyId: { equals: u.familyId } },
+                { role: { equals: "parent" } },
+                { id: { not_equals: originalDoc.id } },
+              ],
+            },
+            overrideAccess: true,
+            req,
+          });
+          if (!parents.totalDocs)
+            throw new APIError("家庭空间至少需要保留一位家长。", 400);
+        }
         if (u.role !== "parent") {
           data.role = originalDoc?.role || "child";
           data.allowPublicPublishing =

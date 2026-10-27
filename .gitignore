@@ -1,5 +1,6 @@
 node_modules/
 .next/
+.next-*/
 .edgeone/
 dist/
 .env
@@ -10,6 +11,7 @@ dist/
 *.db-*
 apps/cms/data/
 apps/cms/media/
+apps/cms/media-originals/
 apps/cms/.tmp/
 coverage/
 test-results/
@@ -17,3 +19,8 @@ playwright-report/
 .DS_Store
 *.log
 *.zip
+/db/
+/media/
+/media-originals/
+/backups/
+/media-worker.lock

@@ -27,6 +27,9 @@ import {
   CheckCircle2,
   FileText,
   WifiOff,
+  ArrowUp,
+  ArrowDown,
+  Star,
 } from "lucide-react";
 import type {
   Entry,
@@ -35,12 +38,16 @@ import type {
   EntryType,
   DatePrecision,
   Visibility,
+  GrowthProject,
 } from "@mylife/shared";
 import { ENTRY_TYPES, displayDate } from "@mylife/shared";
 import { useSession } from "./session";
 import { api, sizeLabel, ApiError } from "@/lib/api";
 import { mediaUrl } from "@/lib/urls";
-import { compressImage, uploadMedia } from "@/lib/media";
+import { prepareImage, uploadMedia } from "@/lib/media";
+import { AttachmentLibrary } from "./media-picker";
+import { AIAssistant } from "./ai-assistant";
+import { Usagi } from "./theme";
 import {
   draftKey,
   readDraft,
@@ -68,12 +75,23 @@ const initial = (entry?: Entry): EntryInput => ({
   content: entry?.content || "",
   reflection: entry?.reflection || "",
   learning: entry?.learning || "",
+  parentNote: entry?.parentNote || "",
   occurredAt: entry?.occurredAt?.slice(0, 10) || today(),
   datePrecision: entry?.datePrecision || "day",
   dateNote: entry?.dateNote || "",
   retrospective: entry?.retrospective || false,
   tags: entry?.tags || [],
   media: entry?.media?.map((m) => (typeof m === "number" ? m : m.id)) || [],
+  coverMedia:
+    typeof entry?.coverMedia === "number"
+      ? entry.coverMedia
+      : entry?.coverMedia?.id || null,
+  projects:
+    entry?.projects?.map((p) => (typeof p === "number" ? p : p.id)) || [],
+  mainProject:
+    typeof entry?.mainProject === "number"
+      ? entry.mainProject
+      : entry?.mainProject?.id || null,
   status: "saved",
   visibility: entry?.visibility || "family",
   revision: entry?.revision,
@@ -91,13 +109,16 @@ const mapMedia = (media: Media): UploadItem => ({
 export function EntryEditor({
   entry,
   onSaved,
+  embedded = false,
 }: {
   entry?: Entry;
   onSaved?: (entry: Entry) => void;
+  embedded?: boolean;
 }) {
   const { user } = useSession();
   const router = useRouter();
   const [form, setForm] = useState<EntryInput>(() => initial(entry));
+  const [projects, setProjects] = useState<GrowthProject[]>([]);
   const [items, setItems] = useState<UploadItem[]>(
     () =>
       entry?.media
@@ -151,7 +172,7 @@ export function EntryEditor({
       );
     try {
       update({ status: "compressing", error: undefined, progress: 0 });
-      const compressed = await compressImage(
+      const compressed = await prepareImage(
         item.file,
         item.imageKind === "document",
       );
@@ -200,6 +221,12 @@ export function EntryEditor({
           }));
           setItems([...restoredItems, ...pending]);
           setRestored(true);
+        } else if (!entry) {
+          const requested = new URLSearchParams(location.search).get("type");
+          if (ENTRY_TYPES.some((t) => t.value === requested)) {
+            setForm((f) => ({ ...f, type: requested as EntryType }));
+            setDocumentImage(requested === "honor");
+          }
         }
       })
       .catch(() => {
@@ -222,6 +249,27 @@ export function EntryEditor({
       window.removeEventListener("offline", disconnected);
     };
   }, [storageKey, entry]);
+  useEffect(() => {
+    let active = true;
+    api<{ docs: GrowthProject[] }>(
+      "/projects?depth=0&limit=100&sort=-createdAt",
+    )
+      .then((r) => {
+        if (!active) return;
+        setProjects(r.docs);
+        const id = Number(new URLSearchParams(location.search).get("project"));
+        if (!entry && id && r.docs.some((p) => p.id === id))
+          setForm((f) => ({
+            ...f,
+            projects: [...new Set([...(f.projects || []), id])],
+            mainProject: f.mainProject || id,
+          }));
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [entry?.id]);
 
   useEffect(() => {
     if (!sheet || !sheetRef.current) return;
@@ -370,6 +418,16 @@ export function EntryEditor({
       objectUrls.current.delete(item.preview);
     }
     setItems((current) => current.filter((i) => i.key !== key));
+    if (item?.media?.id === form.coverMedia) patch("coverMedia", null);
+  }
+  function moveItem(index: number, delta: number) {
+    setItems((current) => {
+      const next = [...current],
+        target = index + delta;
+      if (target < 0 || target >= next.length) return current;
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
   }
   async function startRecording() {
     setError("");
@@ -508,8 +566,13 @@ export function EntryEditor({
     honor:
       "今天的你，又迈出了哪一小步？\n第一次完成、坚持很久、勇敢尝试，都值得记住。",
   };
+  const Root = embedded ? "section" : "main";
   return (
-    <main className="page-content editor-page">
+    <Root
+      className={
+        embedded ? "editor-page embedded-editor" : "page-content editor-page"
+      }
+    >
       <div className="editor-heading">
         <div>
           <span className="eyebrow">COLLECT A LITTLE MOMENT</span>
@@ -629,6 +692,19 @@ export function EntryEditor({
                   </label>
                 </div>
               )}
+              {user.role === "parent" && (
+                <div className="story-extras">
+                  <label>
+                    家长的小小补充
+                    <textarea
+                      value={form.parentNote || ""}
+                      maxLength={10000}
+                      onChange={(e) => patch("parentNote", e.target.value)}
+                      placeholder="补充当时的背景，保留孩子自己的表达。"
+                    />
+                  </label>
+                </div>
+              )}
             </div>
             <div className="attachment-area">
               <div className="attachment-heading">
@@ -677,6 +753,52 @@ export function EntryEditor({
                       >
                         <X size={13} />
                       </button>
+                      {item.status === "ready" && (
+                        <div className="upload-order">
+                          <button
+                            type="button"
+                            aria-label={`把素材 ${i + 1} 前移`}
+                            disabled={i === 0}
+                            onClick={() => moveItem(i, -1)}
+                          >
+                            <ArrowUp size={15} />
+                          </button>
+                          {item.media?.mimeType?.startsWith("image/") && (
+                            <button
+                              type="button"
+                              className={
+                                form.coverMedia === item.media.id
+                                  ? "cover-selected"
+                                  : ""
+                              }
+                              aria-label={
+                                form.coverMedia === item.media.id
+                                  ? "取消记录封面"
+                                  : "设为记录封面"
+                              }
+                              aria-pressed={form.coverMedia === item.media.id}
+                              onClick={() =>
+                                patch(
+                                  "coverMedia",
+                                  form.coverMedia === item.media?.id
+                                    ? null
+                                    : item.media!.id,
+                                )
+                              }
+                            >
+                              <Star size={15} />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            aria-label={`把素材 ${i + 1} 后移`}
+                            disabled={i === items.length - 1}
+                            onClick={() => moveItem(i, 1)}
+                          >
+                            <ArrowDown size={15} />
+                          </button>
+                        </div>
+                      )}
                       <div className="upload-overlay">
                         {item.status === "compressing" ? (
                           <>
@@ -767,8 +889,109 @@ export function EntryEditor({
                 />
                 这次有证书或文字图片，优先保留清晰度
               </label>
+              <AttachmentLibrary
+                selectedIds={items.flatMap((i) =>
+                  i.media ? [i.media.id] : [],
+                )}
+                onSelect={(media) => {
+                  if (
+                    items.length < 12 &&
+                    !items.some((i) => i.media?.id === media.id)
+                  )
+                    setItems((list) => [...list, mapMedia(media)]);
+                }}
+              />
             </div>
           </section>
+          <section className="project-editor-fields">
+            <label>
+              放进哪个成长项目？
+              <small className="muted">
+                可以关联多个项目，公开范围仍由每条记录分别决定。
+              </small>
+            </label>
+            {projects.length ? (
+              <>
+                <div className="project-selector">
+                  {projects.map((p) => (
+                    <button
+                      type="button"
+                      key={p.id}
+                      className={
+                        form.projects?.includes(p.id) ? "selected" : ""
+                      }
+                      aria-pressed={form.projects?.includes(p.id) || false}
+                      onClick={() =>
+                        setForm((f) => {
+                          const selected = f.projects || [];
+                          const next = selected.includes(p.id)
+                            ? selected.filter((id) => id !== p.id)
+                            : [...selected, p.id].slice(0, 8);
+                          return {
+                            ...f,
+                            projects: next,
+                            mainProject: next.includes(f.mainProject || 0)
+                              ? f.mainProject
+                              : next[0] || null,
+                          };
+                        })
+                      }
+                    >
+                      {p.title}
+                    </button>
+                  ))}
+                </div>
+                {Boolean(form.projects?.length) && (
+                  <label>
+                    主要项目
+                    <select
+                      value={form.mainProject || ""}
+                      onChange={(e) =>
+                        patch("mainProject", Number(e.target.value) || null)
+                      }
+                    >
+                      <option value="">不单独指定</option>
+                      {projects
+                        .filter((p) => form.projects?.includes(p.id))
+                        .map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.title}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                )}
+              </>
+            ) : (
+              <p className="muted">一个小计划，可以把相关的记忆串在一起。</p>
+            )}
+            <Link
+              className="text-button"
+              href="/app/projects/new"
+              target="_blank"
+            >
+              <Plus size={15} />
+              建立一个新的小计划
+            </Link>
+          </section>
+          <AIAssistant
+            title={form.title}
+            content={form.content}
+            clientId={form.clientId}
+            audio={items.flatMap((i) =>
+              i.media?.mimeType?.startsWith("audio/") ? [i.media] : [],
+            )}
+            onApply={(title, content, token) =>
+              setForm((f) => ({
+                ...f,
+                title,
+                content,
+                ...(token
+                  ? { aiOriginalToken: f.aiOriginalToken || token }
+                  : {}),
+              }))
+            }
+          />
           <div className="optional-tags">
             <span>给这段记忆贴个小标签</span>
             <div>
@@ -858,7 +1081,7 @@ export function EntryEditor({
           <div className="little-note">
             <span className="note-pin" />
             <span className="eyebrow">A NOTE FOR YOU</span>
-            <span className="note-flower">✳</span>
+            <Usagi size={120} />
             <h3>小事，也闪闪发光。</h3>
             <p>
               不必是获奖，不必是第一名。
@@ -1163,6 +1386,6 @@ export function EntryEditor({
           </section>
         </div>
       )}
-    </main>
+    </Root>
   );
 }

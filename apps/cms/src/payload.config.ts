@@ -7,8 +7,15 @@ import sharp from "sharp";
 import { Users } from "./collections/Users";
 import { Entries } from "./collections/Entries";
 import { Media } from "./collections/Media";
+import { Spaces } from "./collections/Spaces";
+import { Projects } from "./collections/Projects";
+import { EntryHistory } from "./collections/EntryHistory";
+import { FamilyServices } from "./collections/FamilyServices";
 import { member } from "./lib/access";
 import { publicEntryEndpoints } from "./lib/public-entries";
+import { familyEndpoints } from "./lib/family-endpoints";
+import { aiEndpoints, familyService, serviceDTO } from "./lib/ai";
+import { archiveEndpoints } from "./lib/archive";
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const webOrigin = process.env.WEB_ORIGIN || "http://localhost:3000";
 const cmsOrigin = process.env.CMS_ORIGIN || "http://localhost:3001";
@@ -26,11 +33,22 @@ export default buildConfig({
     meta: { titleSuffix: " · MyLife 家长后台" },
     importMap: { baseDir: dirname },
   },
-  collections: [Users, Entries, Media],
+  collections: [
+    Users,
+    Entries,
+    Media,
+    Spaces,
+    Projects,
+    EntryHistory,
+    FamilyServices,
+  ],
   sharp,
   db: sqliteAdapter({
     client: { url: process.env.DATABASE_URL || "file:./data/mylife.db" },
-    push: process.env.NODE_ENV !== "production",
+    push:
+      process.env.NODE_ENV !== "production" &&
+      process.env.MYLIFE_MANAGED_SCHEMA !== "true" &&
+      process.env.MYLIFE_MEDIA_WORKER !== "true",
   }),
   upload: {
     limits: {
@@ -52,7 +70,9 @@ export default buildConfig({
       handler: async (req) =>
         member(req)
           ? Response.json({
-              aiEnabled: false,
+              aiEnabled: serviceDTO(await familyService(req)).enabled,
+              preserveOriginals: serviceDTO(await familyService(req))
+                .preserveOriginals,
               maxUploadMB: Math.min(
                 500,
                 Number(process.env.MAX_UPLOAD_MB) || 100,
@@ -62,5 +82,8 @@ export default buildConfig({
           : Response.json({ error: "请先登录。" }, { status: 401 }),
     },
     ...publicEntryEndpoints,
+    ...familyEndpoints,
+    ...aiEndpoints,
+    ...archiveEndpoints,
   ],
 });

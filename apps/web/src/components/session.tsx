@@ -1,17 +1,38 @@
 "use client";
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+} from "react";
 import { useRouter, usePathname } from "next/navigation";
-import type { Member } from "@mylife/shared";
+import {
+  DEFAULT_PROFILE,
+  type Member,
+  type SpaceProfile,
+} from "@mylife/shared";
 import { api } from "@/lib/api";
 const Session = createContext<{
   user: Member;
   logout: () => Promise<void>;
+  profile: SpaceProfile & { canEdit?: boolean };
+  refreshProfile: () => Promise<void>;
 } | null>(null);
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<Member | null>(null);
   const [error, setError] = useState("");
+  const [profile, setProfile] = useState<SpaceProfile & { canEdit?: boolean }>(
+    DEFAULT_PROFILE,
+  );
+  const refreshProfile = useCallback(async () => {
+    setProfile(await api<SpaceProfile & { canEdit: boolean }>("/family/space"));
+  }, []);
   const router = useRouter();
   const pathname = usePathname();
+  useEffect(() => {
+    if (user) void refreshProfile().catch(() => {});
+  }, [user?.id, refreshProfile]);
   useEffect(() => {
     let active = true;
     api<{ user: Member | null }>("/users/me")
@@ -49,6 +70,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     <Session.Provider
       value={{
         user,
+        profile,
+        refreshProfile,
         logout: async () => {
           await api("/users/logout", { method: "POST" });
           setUser(null);
@@ -57,7 +80,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         },
       }}
     >
-      {children}
+      <div className="theme-scope" data-theme={profile.theme}>
+        {children}
+      </div>
     </Session.Provider>
   );
 }

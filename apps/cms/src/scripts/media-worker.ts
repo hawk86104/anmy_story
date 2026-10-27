@@ -4,11 +4,13 @@ import { readFile, mkdir, rm, stat, unlink, open } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { getPayload } from "payload";
-import config from "../payload.config";
 import { mediaRoot } from "../collections/Media";
 import { closePayload } from "../lib/shutdown";
 
 const once = process.argv.includes("--once");
+// Schema changes belong to the development preflight or production migrations.
+Object.assign(process.env, { MYLIFE_MEDIA_WORKER: "true" });
+const { default: config } = await import("../payload.config");
 const timeout =
   Math.max(30, Number(process.env.VIDEO_TIMEOUT_SECONDS) || 600) * 1000;
 function command(
@@ -61,7 +63,7 @@ try {
 const lock = await open(lockPath, "wx", 0o600);
 await lock.writeFile(String(process.pid));
 await lock.close();
-const payload = await getPayload({ config });
+let payload: Awaited<ReturnType<typeof getPayload>> | undefined;
 let running = true;
 process.on("SIGTERM", () => {
   running = false;
@@ -71,6 +73,7 @@ process.on("SIGINT", () => {
 });
 const workerContext = { mediaWorker: true };
 try {
+  payload = await getPayload({ config });
   // After a process restart, protected originals make interrupted jobs safe to retry.
   const interrupted = await payload.find({
     collection: "media",
@@ -113,7 +116,7 @@ try {
         throw new Error("原视频暂时不可用，请重新上传。");
       const probe = JSON.parse(
         await command(
-          "ffprobe",
+          process.env.FFPROBE_PATH || "ffprobe",
           [
             "-v",
             "error",
@@ -135,7 +138,7 @@ try {
       await mkdir(tempDir, { recursive: true });
       const output = path.join(tempDir, "optimized.mp4");
       await command(
-        "ffmpeg",
+        process.env.FFMPEG_PATH || "ffmpeg",
         [
           "-nostdin",
           "-y",
@@ -171,7 +174,7 @@ try {
       );
       const verified = JSON.parse(
         await command(
-          "ffprobe",
+          process.env.FFPROBE_PATH || "ffprobe",
           [
             "-v",
             "error",
@@ -234,7 +237,10 @@ try {
     if (once) break;
   }
 } finally {
-  await closePayload(payload);
-  await unlink(lockPath).catch(() => {});
+  try {
+    if (payload) await closePayload(payload);
+  } finally {
+    await unlink(lockPath).catch(() => {});
+  }
 }
 process.exit(0);

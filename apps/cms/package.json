@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "next dev --port 3001 --webpack",
+    "dev:prepare": "tsx src/scripts/dev-prepare.ts",
     "build": "payload generate:importmap && next build --webpack",
     "start": "next start --port 3001",
     "typecheck": "tsc --noEmit",
@@ -13,26 +14,28 @@
     "test": "tsx --test --test-force-exit src/tests/*.test.ts",
     "db:migrate": "payload migrate",
     "db:migrate:create": "payload migrate:create",
-    "media:worker": "tsx src/scripts/media-worker.ts"
+    "media:worker": "tsx src/scripts/media-worker.ts",
+    "restore": "tsx src/scripts/restore.ts"
   },
   "dependencies": {
     "@mylife/shared": "0.1.0",
     "@payloadcms/db-sqlite": "3.92.0",
     "@payloadcms/next": "3.92.0",
     "@payloadcms/ui": "3.92.0",
-    "payload": "3.92.0",
+    "dotenv": "^16.6.1",
+    "fflate": "^0.8.3",
+    "graphql": "^16.11.0",
     "next": "16.4.3",
+    "payload": "3.92.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
-    "graphql": "^16.11.0",
-    "sharp": "^0.35.5",
-    "dotenv": "^16.6.1"
+    "sharp": "^0.35.5"
   },
   "devDependencies": {
-    "typescript": "^5.9.3",
-    "tsx": "^4.23.0",
     "@types/node": "^24.10.0",
     "@types/react": "^19.2.0",
-    "@types/react-dom": "^19.2.0"
+    "@types/react-dom": "^19.2.0",
+    "tsx": "^4.23.0",
+    "typescript": "^5.9.3"
   }
 }

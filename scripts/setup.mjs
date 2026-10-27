@@ -21,5 +21,5 @@ for (const app of ["cms", "web"]) {
   console.log(`${app}: 已创建 ${fileURLToPath(dest)}（已被 Git 忽略）`);
 }
 console.log(
-  "请在 apps/cms/.env 中填写家长与孩子的邮箱和密码，再执行 npm run seed。",
+  "请在 apps/cms/.env 中填写家长与孩子的邮箱和密码，再执行 npm run dev:prepare 和 npm run seed。",
 );
