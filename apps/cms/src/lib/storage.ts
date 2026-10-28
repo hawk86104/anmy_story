@@ -11,6 +11,7 @@ export const originalsRoot = path.resolve(
 export type StoredMedia = {
   filename?: string | null;
   prefix?: string | null;
+  _objectKey?: string | null;
   storage?: string | null;
   originalFilename?: string | null;
 };
@@ -68,7 +69,7 @@ export function datePrefix(value: unknown = new Date().toISOString()) {
 export function mediaKey(doc: StoredMedia, filename = doc.filename) {
   if (!filename || path.basename(filename) !== filename)
     throw new APIError("无效的素材文件名。", 400);
-  return safeKey(doc.prefix ? `${doc.prefix}/${filename}` : filename);
+  return safeKey([doc.prefix, doc._objectKey, filename].filter(Boolean).join("/"));
 }
 export function localMediaPath(key: string) {
   safeKey(key);

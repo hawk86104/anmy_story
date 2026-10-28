@@ -302,6 +302,16 @@ export const Media: CollectionConfig = {
         }
         // Storage coordinates are server-owned, including the plugin's optional object key.
         data._objectKey = originalDoc?._objectKey || null;
+        if (context.mediaMigration) {
+          if (
+            typeof context.mediaMigrationObjectKey !== "string" ||
+            !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+              context.mediaMigrationObjectKey,
+            )
+          )
+            throw new APIError("无效的素材迁移目录。", 400);
+          data._objectKey = context.mediaMigrationObjectKey;
+        }
         data.originalSize =
           originalDoc?.originalSize ||
           Number(data.originalSize) ||

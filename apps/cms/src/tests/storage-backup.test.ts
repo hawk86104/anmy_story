@@ -7,6 +7,7 @@ import {
   mkdir,
   writeFile,
   access,
+  readFile,
 } from "node:fs/promises";
 import path from "node:path";
 import { tmpdir } from "node:os";
@@ -259,6 +260,7 @@ test(
             overrideAccess: false,
             data: {
               prefix: "media/1900-01-01",
+              _objectKey: "other-deployment",
               storage: "local",
               filename: otherMedia.filename,
               mimeType: "application/pdf",
@@ -266,6 +268,7 @@ test(
             },
           });
           assert.equal(protectedMedia.prefix, "media/2020-02-03");
+          assert.equal(protectedMedia._objectKey, media._objectKey);
           assert.equal(protectedMedia.storage, "cos");
           assert.equal(protectedMedia.filename, media.filename);
           assert.equal(protectedMedia.mimeType, media.mimeType);
@@ -558,6 +561,51 @@ test(
             overrideAccess: true,
           });
           assert.equal(nativeVersions.totalDocs, 0);
+        },
+      );
+      await t.test(
+        "迁移旧素材时保留其他环境的同名云端文件，连同原件安全迁移",
+        async () => {
+          process.env.MEDIA_STORAGE = "local";
+          let legacy: Awaited<ReturnType<typeof upload>>;
+          try {
+            legacy = await upload(parent);
+          } finally {
+            process.env.MEDIA_STORAGE = "cos";
+          }
+          const legacyData = await payload.findByID({
+            collection: "media",
+            id: legacy.id,
+            overrideAccess: true,
+          });
+          const localFile = storage.localMediaPath(storage.mediaKey(legacyData));
+          const localOriginal = storage.originalLocation(legacyData).local;
+          const originalBytes = await readFile(localOriginal);
+          const storedBytes = await readFile(localFile);
+          const collisionKey = `${storage.datePrefix(legacyData.createdAt)}/${legacyData.filename}`;
+          const collisionBytes = Buffer.from("other environment");
+          objects.set(collisionKey, collisionBytes);
+          const { migrateMedia } = await import("../scripts/migrate-media");
+          const preview = await migrateMedia(payload, false);
+          assert.deepEqual(preview.missing, []);
+          assert.equal(preview.migrated, 0);
+          await access(localFile);
+          assert.deepEqual(objects.get(collisionKey), collisionBytes);
+          const result = await migrateMedia(payload, true);
+          assert.deepEqual(result.missing, []);
+          assert.equal(result.migrated, 1);
+          const migrated = await payload.findByID({
+            collection: "media",
+            id: legacy.id,
+            overrideAccess: true,
+          });
+          assert.equal(migrated.storage, "cos");
+          assert.match(migrated._objectKey || "", /^[0-9a-f-]{36}$/);
+          assert.deepEqual(objects.get(storage.mediaKey(migrated)), storedBytes);
+          assert.deepEqual(objects.get(migrated.originalFilename!), originalBytes);
+          assert.deepEqual(objects.get(collisionKey), collisionBytes);
+          await assert.rejects(access(localFile));
+          await assert.rejects(access(localOriginal));
         },
       );
     } finally {

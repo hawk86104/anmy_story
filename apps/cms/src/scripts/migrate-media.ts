@@ -1,8 +1,9 @@
 import "dotenv/config";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { readFile, unlink, mkdir, writeFile } from "node:fs/promises";
-import { createHash } from "node:crypto";
-import { getPayload } from "payload";
+import { createHash, randomUUID } from "node:crypto";
+import { getPayload, type Payload } from "payload";
 import { closePayload } from "../lib/shutdown";
 import {
   datePrefix,
@@ -14,13 +15,7 @@ import {
   storageMode,
 } from "../lib/storage";
 
-if (storageMode() !== "cos")
-  throw new Error("请先配置 MEDIA_STORAGE=cos 及 COS 服务端环境变量。");
-process.env.MYLIFE_MANAGED_SCHEMA = "true";
-const { default: config } = await import("../payload.config");
-const payload = await getPayload({ config });
-const apply = process.argv.includes("--apply");
-try {
+export async function migrateMedia(payload: Payload, apply: boolean) {
   const files = await payload.find({
     collection: "media",
     pagination: false,
@@ -72,9 +67,10 @@ try {
     }
     const original = file.originalFilename ? originalLocation(file) : null;
     const originalBytes = original ? await readFile(original.local) : null;
-    const key = `${prefix}/${file.filename}`;
+    const objectKey = randomUUID();
+    const key = `${prefix}/${objectKey}/${file.filename}`;
     const originalKey = original
-      ? `${prefix}/originals/${path.basename(file.originalFilename!)}`
+      ? `${prefix}/${objectKey}/originals/${path.basename(file.originalFilename!)}`
       : null;
     if (!apply) {
       console.log(
@@ -112,11 +108,17 @@ try {
     await payload.update({
       collection: "media",
       id: file.id,
-      data: { storage: "cos", prefix, originalFilename: originalKey },
+      data: {
+        storage: "cos",
+        prefix,
+        _objectKey: objectKey,
+        originalFilename: originalKey,
+      },
       overrideAccess: true,
       context: {
         mediaWorker: true,
         mediaMigration: true,
+        mediaMigrationObjectKey: objectKey,
         recordCreatedAt: createdAt,
       },
     });
@@ -125,7 +127,18 @@ try {
     migrated++;
     console.log(`已迁移并清理本地副本 #${file.id} → ${prefix}/`);
   }
-  const report = { apply, total: files.totalDocs, migrated, pending, missing };
+  return { apply, total: files.totalDocs, migrated, pending, missing };
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  if (storageMode() !== "cos")
+    throw new Error("请先配置 MEDIA_STORAGE=cos 及 COS 服务端环境变量。");
+  process.env.MYLIFE_MANAGED_SCHEMA = "true";
+  const { default: config } = await import("../payload.config");
+  const payload = await getPayload({ config });
+  const apply = process.argv.includes("--apply");
+  try {
+    const report = await migrateMedia(payload, apply);
   if (apply) {
     const reportPath = path.resolve(
       process.env.MEDIA_MIGRATION_REPORT ||
@@ -135,7 +148,8 @@ try {
     await writeFile(reportPath, JSON.stringify(report, null, 2));
   }
   console.log(JSON.stringify(report));
-  if (missing.length) process.exitCode = 1;
-} finally {
-  await closePayload(payload);
+    if (report.missing.length) process.exitCode = 1;
+  } finally {
+    await closePayload(payload);
+  }
 }
