@@ -18,6 +18,10 @@ import { aiEndpoints, familyService, serviceDTO } from "./lib/ai";
 import { archiveEndpoints } from "./lib/archive";
 import { withEntryConcurrency } from "./lib/entry-concurrency";
 import { historyImportEndpoints } from "./lib/history-import";
+import { cloudStoragePlugin } from "@payloadcms/plugin-cloud-storage";
+import { mediaStorageAdapter } from "./lib/storage-adapter";
+import { StorageCleanup } from "./collections/StorageCleanup";
+import { backupManagementEndpoints } from "./lib/backup-management";
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const webOrigin = process.env.WEB_ORIGIN || "http://localhost:3000";
 const cmsOrigin = process.env.CMS_ORIGIN || "http://localhost:3001";
@@ -34,6 +38,7 @@ export default buildConfig({
     user: Users.slug,
     meta: { titleSuffix: " · MyLife 家长后台" },
     importMap: { baseDir: dirname },
+    components: { beforeDashboard: ["./components/DataManagement"] },
   },
   collections: [
     Users,
@@ -43,6 +48,13 @@ export default buildConfig({
     Projects,
     EntryHistory,
     FamilyServices,
+    StorageCleanup,
+  ],
+  plugins: [
+    cloudStoragePlugin({
+      alwaysInsertFields: true,
+      collections: { media: { adapter: mediaStorageAdapter, prefix: "" } },
+    }),
   ],
   sharp,
   db: withEntryConcurrency(
@@ -59,7 +71,12 @@ export default buildConfig({
   upload: {
     limits: {
       fileSize:
-        Math.min(500, Number(process.env.MAX_UPLOAD_MB) || 100) * 1024 * 1024,
+        Math.max(
+          Math.min(2048, Number(process.env.MAX_BACKUP_MB) || 1024),
+          Math.min(500, Number(process.env.MAX_UPLOAD_MB) || 100),
+        ) *
+        1024 *
+        1024,
     },
     abortOnLimit: true,
   },
@@ -92,5 +109,6 @@ export default buildConfig({
     ...aiEndpoints,
     ...archiveEndpoints,
     ...historyImportEndpoints,
+    ...backupManagementEndpoints,
   ],
 });

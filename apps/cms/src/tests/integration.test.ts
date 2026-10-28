@@ -1,3 +1,4 @@
+process.env.MEDIA_STORAGE = "local";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm, readFile, access } from "node:fs/promises";
@@ -25,6 +26,8 @@ test(
     const { getPayload } = await import("payload");
     const { default: config } = await import("../payload.config");
     const payload: Payload = await getPayload({ config });
+    const { localMediaPath, mediaKey, flushStorageDeletes } =
+      await import("../lib/storage");
     const family = randomUUID(),
       otherFamily = randomUUID();
     const bootstrap = { overrideAccess: true, context: { bootstrap: true } };
@@ -497,7 +500,7 @@ test(
           assert.ok((media.width || 0) <= 2048);
           assert.equal(media.processingStatus, "ready");
           const stored = await sharp(
-            path.join(temp, "media", media.filename!),
+            localMediaPath(mediaKey(media)),
           ).metadata();
           assert.equal(stored.format, "webp");
           assert.equal(stored.exif, undefined);
@@ -733,7 +736,7 @@ test(
             overrideAccess: false,
           });
           await assert.rejects(deleteMedia(parent), /仍被成长记录使用/);
-          await access(path.join(temp, "media", media.filename!));
+          await access(localMediaPath(mediaKey(media)));
           await payload.update({
             collection: "entries",
             id: linked.id,
@@ -746,12 +749,11 @@ test(
             [],
           );
           await deleteMedia(parent);
+          assert.equal((await flushStorageDeletes(payload, family)).pending, 0);
           await assert.rejects(
             payload.findByID({ collection: "media", id: media.id }),
           );
-          await assert.rejects(
-            access(path.join(temp, "media", media.filename!)),
-          );
+          await assert.rejects(access(localMediaPath(mediaKey(media))));
         },
       );
       await t.test(
@@ -806,7 +808,7 @@ test(
             id: media.id,
           });
           assert.equal(processed.processingStatus, "ready");
-          const output = path.join(temp, "media", processed.filename!);
+          const output = localMediaPath(mediaKey(processed));
           const probe = JSON.parse(
             (
               await run(process.env.FFPROBE_PATH || "ffprobe", [
@@ -822,9 +824,7 @@ test(
           assert.ok(probe.streams[0].width <= 1280);
           assert.ok(probe.streams[0].height <= 720);
           assert.equal(probe.streams[0].codec_name, "h264");
-          await assert.rejects(
-            access(path.join(temp, "media", media.filename!)),
-          );
+          await assert.rejects(access(localMediaPath(mediaKey(media))));
         },
       );
     } finally {

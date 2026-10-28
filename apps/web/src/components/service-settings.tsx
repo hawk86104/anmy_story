@@ -1,9 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Check, Download, FileJson, LockKeyhole, Sparkles } from "lucide-react";
+import { Check, FileJson, LockKeyhole, Sparkles } from "lucide-react";
 import type { AIConfiguration } from "@mylife/shared";
 import { api } from "@/lib/api";
 import { apiUrl } from "@/lib/urls";
+import { FamilyDataManagement } from "./family-data-management";
 type Settings = AIConfiguration & {
   preserveOriginals: boolean;
   lastExportAt?: string | null;
@@ -208,17 +209,16 @@ export function ServiceSettings() {
           {message}
         </p>
       )}
+      <FamilyDataManagement
+        onChanged={async () => setForm(await api<Settings>("/family/ai"))}
+      />
       <section className="settings-panel settings-form">
-        <h2>把成长，稳稳带走。</h2>
+        <h2>另存可读数据</h2>
         <p>
           完整 ZIP 包含记录、最初表达、作品附件、项目、可用版本和
           Markdown。只保存在家庭空间的内容也会包含在内，请妥善保管。
         </p>
         <div className="settings-actions archive-downloads">
-          <a className="primary-button" href={apiUrl("/family/export")}>
-            <Download size={17} />
-            导出完整成长档案 ZIP
-          </a>
           <a
             className="secondary-button"
             href={apiUrl("/family/export?format=json")}
@@ -232,17 +232,15 @@ export function ServiceSettings() {
             最近发起导出：{new Date(form.lastExportAt).toLocaleString("zh-CN")}
           </small>
         )}
-        <small>
-          下载后请保留完整压缩包，并检查其中的 missing-files.json 是否为空。
-        </small>
+        <small>JSON 仅包含索引与设置；完整还原请使用上方的 ZIP 备份。</small>
         <details className="restore-instructions">
           <summary>备份与恢复说明</summary>
           <p>
-            ZIP 可以解压后直接阅读
-            Markdown、查看媒体和项目数据。恢复到站点时，先由家长建立目标家庭账号，再使用项目提供的恢复工具检查并导入；记录默认保持家庭可见。
+            ZIP 可以解压后阅读 Markdown
+            和附件，也可在上方预检并整体还原。整体还原保留备份中的公开状态。
           </p>
           <p>
-            服务器还应定期备份数据库、素材目录和保留原件目录，并在独立环境演练恢复。完整步骤见项目的乌萨奇版本迭代说明。
+            服务器环境变量和登录密码需要单独备份。请妥善保管下载文件，避免公开分享。
           </p>
         </details>
       </section>

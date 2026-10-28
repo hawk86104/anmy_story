@@ -1,16 +1,22 @@
 import path from "node:path";
 import { createReadStream } from "node:fs";
+import { createHash } from "node:crypto";
 import { Zip, ZipPassThrough } from "fflate";
 import { APIError, type Endpoint, type PayloadRequest } from "payload";
 import { entryTitle } from "@mylife/shared";
 import { member } from "./access";
-import { familyService } from "./ai";
-import { mediaRoot, originalsRoot } from "../collections/Media";
+import { familyService, decryptServiceKey } from "./ai";
+import { originalLocation, readMedia, readStored } from "./storage";
 import { json, noStore } from "./public-entries";
 
 export const archiveFileName = (id: number, name: string) =>
   `${id}-${path.basename(name).replace(/[\\/:*?"<>|\x00-\x1f]/g, "_")}`;
-type ArchiveFile = { name: string; path?: string; data?: Uint8Array };
+type ArchiveFile = {
+  name: string;
+  path?: string;
+  data?: Uint8Array;
+  load?: () => Promise<Buffer>;
+};
 export async function createFamilyArchive(req: PayloadRequest) {
   const u = member(req);
   if (u?.role !== "parent") throw new APIError("仅家长可以导出家庭档案。", 403);
@@ -36,9 +42,11 @@ export async function createFamilyArchive(req: PayloadRequest) {
       }),
       req.payload.find({ collection: "users", where, ...options }),
     ]);
+  const settings = await familyService(req);
   const dataset = {
     format: "mylife-archive",
     version: 1,
+    scope: "full-family",
     exportedAt: new Date().toISOString(),
     familyId: u.familyId,
     profile: spaces.docs[0] || null,
@@ -51,8 +59,25 @@ export async function createFamilyArchive(req: PayloadRequest) {
       name: m.name,
       email: m.email,
       role: m.role,
+      allowPublicPublishing: m.allowPublicPublishing,
     })),
+    settings: settings
+      ? {
+          enabled: settings.enabled,
+          endpoint: settings.endpoint,
+          model: settings.model,
+          transcriptionModel: settings.transcriptionModel,
+          consent: settings.consent,
+          consentAt: settings.consentAt,
+          preserveOriginals: settings.preserveOriginals,
+          lastExportAt: settings.lastExportAt,
+          apiKey: settings.keyCipher
+            ? decryptServiceKey(settings.keyCipher, u.familyId)
+            : null,
+        }
+      : null,
     media: media.docs.map((m) => ({
+      ...m,
       id: m.id,
       filename: m.filename,
       mimeType: m.mimeType,
@@ -68,6 +93,8 @@ export async function createFamilyArchive(req: PayloadRequest) {
         ? `originals/${archiveFileName(m.id, m.originalFilename)}`
         : null,
       originalMimeType: m.originalMimeType,
+      sha256: "",
+      originalSha256: "",
     })),
   };
   const files: ArchiveFile[] = [
@@ -78,7 +105,7 @@ export async function createFamilyArchive(req: PayloadRequest) {
     {
       name: "README.md",
       data: Buffer.from(
-        "# MyLife 成长档案\n\narchive.json 保存记录、最初表达、项目、成员映射与可用的版本；entries/ 是可直接阅读的 Markdown；media/ 保存素材，originals/ 保存选择保留的上传原件。\n\n不包含登录密码、密钥或 AI 服务凭据。首次升级前已被删除的历史或素材无法由本备份恢复。\n\n请检查 missing-files.json；缺失文件与导出过程中的读取失败会列在那里。保管完整 ZIP，并定期额外备份服务器数据库与素材目录。\n\n恢复方法见项目 docs/USAGI_ITERATION.md 与 npm run restore -- --help。恢复工具默认只检查，明确 --apply 才写入；恢复到已建立的家庭账号，记录默认保持家庭可见。\n",
+        "# MyLife 完整家庭备份\n\narchive.json 保存记录、项目、主页、成员、全部可用历史及家庭服务设置。media/ 与 originals/ 包含实际附件（从 COS 或旧本地存储读取），entries/ 为可读 Markdown。\n\n备份包含私密记录及已配置的 AI 服务密钥，请私密保管。不包含登录密码、COS 凭据或服务器环境变量。成员账号缺失时会创建随机密码账号，需要家长重新设置密码。\n\n后台设置页可预检并还原完整 ZIP；还原整体备份会替换当前家庭的资料与设置，保留现有登录账号。必须先通过文件完整性校验。missing-files.json 应为空；有缺失的包不可执行整体还原。旧版命令行增量恢复仍可使用。\n",
       ),
     },
   ];
@@ -92,14 +119,35 @@ export async function createFamilyArchive(req: PayloadRequest) {
     if (m.filename)
       files.push({
         name: `media/${archiveFileName(m.id, m.filename)}`,
-        path: path.join(mediaRoot, path.basename(m.filename)),
+        load: () => readMedia(m),
       });
     if (m.originalFilename)
       files.push({
         name: `originals/${archiveFileName(m.id, m.originalFilename)}`,
-        path: path.join(originalsRoot, path.basename(m.originalFilename)),
+        load: () => {
+          const original = originalLocation(m);
+          return readStored(original.key, m.storage || "local", original.local);
+        },
       });
   }
+  // Check bytes before sending headers. The ZIP index carries hashes for restore preflight.
+  for (const m of dataset.media) {
+    if (m.archivePath)
+      m.sha256 = await readMedia(m)
+        .then((bytes) => createHash("sha256").update(bytes).digest("hex"))
+        .catch(() => "");
+    if (m.originalPath) {
+      const location = originalLocation(m);
+      m.originalSha256 = await readStored(
+        location.key,
+        m.storage || "local",
+        location.local,
+      )
+        .then((bytes) => createHash("sha256").update(bytes).digest("hex"))
+        .catch(() => "");
+    }
+  }
+  files[0].data = Buffer.from(JSON.stringify(dataset, null, 2));
   return { dataset, files };
 }
 export function zipArchive(files: ArchiveFile[]) {
@@ -134,10 +182,19 @@ export function zipArchive(files: ArchiveFile[]) {
           if (cancelled) return;
           const item = new ZipPassThrough(file.name);
           zip.add(item);
-          if (file.data) {
-            for (let i = 0; i < file.data.length; i += 65536) {
+          if (file.data || file.load) {
+            const bytes =
+              file.data ||
+              (await file.load!().catch(() => {
+                missing.push({
+                  file: file.name,
+                  reason: "导出时文件不可用，请检查旧文件或 COS 对象。",
+                });
+                return Buffer.alloc(0);
+              }));
+            for (let i = 0; i < bytes.length; i += 65536) {
               if (cancelled) return;
-              item.push(file.data.subarray(i, i + 65536));
+              item.push(bytes.subarray(i, i + 65536));
               await wait();
             }
           } else if (file.path) {

@@ -15,14 +15,17 @@
     "db:migrate": "payload migrate",
     "db:migrate:create": "payload migrate:create",
     "media:worker": "tsx src/scripts/media-worker.ts",
-    "restore": "tsx src/scripts/restore.ts"
+    "restore": "tsx src/scripts/restore.ts",
+    "media:migrate": "tsx src/scripts/migrate-media.ts"
   },
   "dependencies": {
     "@libsql/client": "0.14.0",
     "@mylife/shared": "0.1.0",
     "@payloadcms/db-sqlite": "3.92.0",
     "@payloadcms/next": "3.92.0",
+    "@payloadcms/plugin-cloud-storage": "3.92.0",
     "@payloadcms/ui": "3.92.0",
+    "cos-nodejs-sdk-v5": "^3.0.0",
     "dotenv": "^16.6.1",
     "drizzle-orm": "0.45.2",
     "fflate": "^0.8.3",

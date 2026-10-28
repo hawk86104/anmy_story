@@ -1,19 +1,25 @@
 import path from "node:path";
 import sharp from "sharp";
-import { mkdir, writeFile, unlink, stat } from "node:fs/promises";
-import { createReadStream } from "node:fs";
-import { Readable } from "node:stream";
 import { randomUUID } from "node:crypto";
 import type { AccessResult, CollectionConfig, Where } from "payload";
 import { APIError } from "payload";
 import { authenticated, member, relationId } from "../lib/access";
 import { publicEntryWhere } from "../lib/public-entries";
 import { mediaReferences, publicDecorativeMedia } from "../lib/media-links";
+import {
+  datePrefix,
+  mediaRoot,
+  originalsRoot,
+  mediaKey,
+  originalLocation,
+  putStored,
+  queueStorageDelete,
+  readStored,
+  signedMediaURL,
+  storageMode,
+} from "../lib/storage";
 
-export const mediaRoot = path.resolve(process.env.MEDIA_ROOT || "./media");
-export const originalsRoot = path.resolve(
-  process.env.ORIGINALS_ROOT || `${mediaRoot}-originals`,
-);
+export { mediaRoot, originalsRoot };
 export const Media: CollectionConfig = {
   slug: "media",
   labels: { singular: "素材", plural: "素材库" },
@@ -137,27 +143,56 @@ export const Media: CollectionConfig = {
           overrideAccess: true,
           req,
         });
-        if (media.originalFilename)
-          req.context.deletedOriginals = {
-            ...((req.context.deletedOriginals || {}) as Record<string, string>),
-            [String(id)]: media.originalFilename,
-          };
+        const clearing =
+          req.context.clearFamily === true && member(req)?.role === "parent";
         if (["queued", "processing"].includes(media.processingStatus || ""))
           throw new APIError(
             "视频正在排队或处理中，请等处理完成后再删除。",
             409,
           );
-        if (await mediaReferences(Number(id), req))
+        if (!clearing && (await mediaReferences(Number(id), req)))
           throw new APIError(
             "这份素材仍被成长记录使用，或用于个人主页、项目，请先移除关联后再删除。",
             409,
           );
+        if (media.filename)
+          await queueStorageDelete(
+            req,
+            media.familyId,
+            mediaKey(media),
+            media.storage || "local",
+          );
+        if (media.originalFilename)
+          await queueStorageDelete(
+            req,
+            media.familyId,
+            media.originalFilename,
+            media.storage || "local",
+            true,
+          );
+        ((req.context.deletedMediaIds ||= []) as string[]).push(String(id));
       },
     ],
     beforeOperation: [
       async ({ args, operation, req }) => {
         if (
+          req.file &&
+          req.file.size >
+            Math.min(500, Number(process.env.MAX_UPLOAD_MB) || 100) *
+              1024 *
+              1024
+        )
+          throw new APIError("文件超过上传上限，请选择更小的文件。", 413);
+        if ((operation === "create" || operation === "update") && req.file) {
+          delete req.context._payloadCloudStorage;
+          delete req.context.originalUpload;
+          req.file.name = `${randomUUID()}${path.extname(path.basename(req.file.name)).toLowerCase()}`;
+        }
+        if (req.context.restoredOriginal)
+          req.context.originalUpload = req.context.restoredOriginal;
+        if (
           operation === "create" &&
+          !req.context.restoreArchive &&
           req.file &&
           /^(image|video)\//.test(req.file.mimetype) &&
           member(req)
@@ -182,6 +217,7 @@ export const Media: CollectionConfig = {
         }
         if (
           (operation === "create" || operation === "update") &&
+          !req.context.restoreArchive &&
           req.file &&
           /^image\/(jpeg|png|webp)$/.test(req.file.mimetype)
         ) {
@@ -219,11 +255,53 @@ export const Media: CollectionConfig = {
       },
     ],
     beforeChange: [
-      ({ data, req, originalDoc, context, operation }) => {
+      async ({ data, req, originalDoc, context, operation }) => {
         const u = member(req);
         if (!u && !context.mediaWorker) throw new APIError("请先登录。", 401);
         data.familyId = originalDoc?.familyId || u?.familyId;
         data.owner = originalDoc?.owner || u?.id;
+        if (originalDoc && !req.file) {
+          for (const field of [
+            "filename",
+            "mimeType",
+            "filesize",
+            "width",
+            "height",
+            "sizes",
+            "focalX",
+            "focalY",
+            "createdAt",
+          ])
+            data[field] = originalDoc[field];
+        }
+        if (context.restoreArchive && u?.role === "parent")
+          data.owner = context.restoreMediaOwner || data.owner;
+        data.prefix =
+          originalDoc?.prefix ||
+          (req.file
+            ? datePrefix(
+                req.data?.recordCreatedAt ||
+                  data.createdAt ||
+                  new Date().toISOString(),
+              )
+            : "");
+        if (
+          !originalDoc?.id &&
+          context.restoreArchive &&
+          u?.role === "parent" &&
+          typeof context.restoreMediaPrefix === "string" &&
+          /^media\/\d{4}-\d{2}-\d{2}$/.test(context.restoreMediaPrefix)
+        )
+          data.prefix = context.restoreMediaPrefix;
+        data.storage = req.file
+          ? storageMode()
+          : originalDoc?.storage || "local";
+        if (context.mediaMigration) {
+          data.prefix = datePrefix(context.recordCreatedAt);
+          data.storage = "cos";
+        }
+        // Storage coordinates are server-owned, including the plugin's optional object key.
+        data._objectKey = originalDoc?._objectKey || null;
         data.originalSize =
           originalDoc?.originalSize ||
           Number(data.originalSize) ||
@@ -237,58 +315,45 @@ export const Media: CollectionConfig = {
         }
         if (!context.mediaWorker) {
           data.processingError = originalDoc?.processingError || null;
+          if (context.restoreArchive && u?.role === "parent")
+            data.processingError = context.restoredMediaError || null;
           data.processingStatus =
             originalDoc?.processingStatus ||
-            (req.file?.mimetype.startsWith("video/") ? "queued" : "ready");
+            (context.restoreArchive
+              ? context.restoredMediaStatus || "ready"
+              : req.file?.mimetype.startsWith("video/")
+                ? "queued"
+                : "ready");
           if (operation === "update" && req.file)
             throw new APIError(
               "已关联素材不能被直接替换，请上传新素材后修改记录。",
               400,
             );
         }
-        return data;
-      },
-    ],
-    afterChange: [
-      async ({ doc, operation, req }) => {
         const original = req.context.originalUpload as
           { data: Buffer; name: string; mimeType: string } | undefined;
         if (operation === "create" && original) {
-          const filename = `${doc.id}-${randomUUID()}${path.extname(path.basename(original.name)).toLowerCase()}`;
-          await mkdir(originalsRoot, { recursive: true });
-          await writeFile(path.join(originalsRoot, filename), original.data, {
-            flag: "wx",
-            mode: 0o600,
-          });
-          const updated = await req.payload.update({
-            collection: "media",
-            id: doc.id,
-            data: {
-              originalFilename: filename,
-              originalMimeType: original.mimeType,
-              preserveOriginal: true,
-            },
-            overrideAccess: true,
-            context: { mediaWorker: true },
-            req,
-          });
-          return updated;
+          const key = `${data.prefix}/originals/${randomUUID()}${path.extname(path.basename(original.name)).toLowerCase()}`;
+          await putStored(key, original.data, original.mimeType);
+          data.originalFilename = key;
+          data.originalMimeType = original.mimeType;
+          data.preserveOriginal = true;
+          if (req.context.trackUploads)
+            (
+              (req.context.uploadedObjects ||= []) as {
+                key: string;
+                mode: string;
+              }[]
+            ).push({ key, mode: storageMode() });
         }
-        return doc;
+        return data;
       },
     ],
-    afterDelete: [
-      async ({ doc, req }) => {
-        const filename =
-          (
-            req.context.deletedOriginals as Record<string, string> | undefined
-          )?.[String(doc.id)] || doc.originalFilename;
-        if (filename)
-          await unlink(path.join(originalsRoot, path.basename(filename))).catch(
-            (e: NodeJS.ErrnoException) => {
-              if (e.code !== "ENOENT") throw e;
-            },
-          );
+    afterRead: [
+      ({ doc }) => {
+        if (doc.storage === "cos" && doc.filename)
+          doc.url = signedMediaURL(mediaKey(doc));
+        return doc;
       },
     ],
   },
@@ -322,24 +387,22 @@ export const Media: CollectionConfig = {
             { error: "这份素材没有另存的上传原件。" },
             { status: 404 },
           );
-        const file = path.join(
-          originalsRoot,
-          path.basename(m.originalFilename),
-        );
-        const info = await stat(file).catch(() => null);
-        if (!info)
+        const location = originalLocation(m);
+        const bytes = await readStored(
+          location.key,
+          m.storage || "local",
+          location.local,
+        ).catch(() => null);
+        if (!bytes)
           return Response.json({ error: "原件暂时不可用。" }, { status: 404 });
-        return new Response(
-          Readable.toWeb(createReadStream(file)) as ReadableStream<Uint8Array>,
-          {
-            headers: {
-              "Content-Type": m.originalMimeType || "application/octet-stream",
-              "Content-Length": String(info.size),
-              "Content-Disposition": `attachment; filename="original-${m.id}${path.extname(m.originalFilename)}"`,
-              "Cache-Control": "no-store",
-            },
+        return new Response(new Uint8Array(bytes), {
+          headers: {
+            "Content-Type": m.originalMimeType || "application/octet-stream",
+            "Content-Length": String(bytes.length),
+            "Content-Disposition": `attachment; filename="original-${m.id}${path.extname(m.originalFilename)}"`,
+            "Cache-Control": "no-store",
           },
-        );
+        });
       },
     },
     {
@@ -374,6 +437,19 @@ export const Media: CollectionConfig = {
     },
   ],
   fields: [
+    {
+      name: "storage",
+      type: "select",
+      options: ["local", "cos"],
+      admin: { readOnly: true },
+      defaultValue: "local",
+    },
+    {
+      name: "prefix",
+      label: "素材日期目录",
+      type: "text",
+      admin: { readOnly: true },
+    },
     { name: "alt", label: "素材说明", type: "text", maxLength: 300 },
     {
       name: "preserveOriginal",

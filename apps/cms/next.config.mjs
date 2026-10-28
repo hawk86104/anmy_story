@@ -3,5 +3,6 @@ export default withPayload({
   distDir: process.env.NEXT_DIST_DIR || ".next",
   poweredByHeader: false,
   serverExternalPackages: ["sharp"],
+  transpilePackages: ["@mylife/shared"],
   experimental: { serverActions: { bodySizeLimit: "10mb" } },
 });

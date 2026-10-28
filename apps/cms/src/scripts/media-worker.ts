@@ -1,11 +1,12 @@
 import "dotenv/config";
 import { spawn } from "node:child_process";
-import { readFile, mkdir, rm, stat, unlink, open } from "node:fs/promises";
+import { readFile, writeFile, mkdir, rm, unlink, open } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { getPayload } from "payload";
-import { mediaRoot } from "../collections/Media";
+import { readMedia, flushStorageDeletes } from "../lib/storage";
 import { closePayload } from "../lib/shutdown";
+import { cleanupBackupTemps } from "../lib/backup-management";
 
 const once = process.argv.includes("--once");
 // Schema changes belong to the development preflight or production migrations.
@@ -65,6 +66,7 @@ await lock.writeFile(String(process.pid));
 await lock.close();
 let payload: Awaited<ReturnType<typeof getPayload>> | undefined;
 let running = true;
+let nextBackupCleanup = 0;
 process.on("SIGTERM", () => {
   running = false;
 });
@@ -90,6 +92,11 @@ try {
     });
   console.log("MyLife 媒体处理已启动。");
   while (running) {
+    if (Date.now() >= nextBackupCleanup) {
+      await cleanupBackupTemps();
+      nextBackupCleanup = Date.now() + 60000;
+    }
+    await flushStorageDeletes(payload);
     const batch = await payload.find({
       collection: "media",
       where: { processingStatus: { equals: "queued" } },
@@ -111,9 +118,15 @@ try {
         data: { processingStatus: "processing", processingError: null },
         context: workerContext,
       });
-      const input = path.resolve(mediaRoot, path.basename(doc.filename || ""));
-      if (!doc.filename || !(await stat(input)).size)
+      await mkdir(tempDir, { recursive: true });
+      const input = path.join(
+        tempDir,
+        `input${path.extname(doc.filename || ".mp4")}`,
+      );
+      const source = await readMedia(doc);
+      if (!doc.filename || !source.length)
         throw new Error("原视频暂时不可用，请重新上传。");
+      await writeFile(input, source);
       const probe = JSON.parse(
         await command(
           process.env.FFPROBE_PATH || "ffprobe",
@@ -214,8 +227,7 @@ try {
         },
         context: workerContext,
       });
-      // Only delete the protected original after the verified replacement was persisted.
-      await unlink(input).catch(() => {});
+      await flushStorageDeletes(payload);
       console.log(`素材 #${doc.id}：视频处理完成。`);
     } catch (error) {
       await payload.update({

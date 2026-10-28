@@ -72,13 +72,7 @@ export function MediaPicker({
     <div className="media-picker">
       <span className="field-label">{label}</span>
       <div className="profile-image-row">
-        {value && (
-          <img
-            src={mediaUrl(value.url)}
-            crossOrigin="use-credentials"
-            alt={value.alt || label}
-          />
-        )}
+        {value && <img src={mediaUrl(value.url)} alt={value.alt || label} />}
         <label className="secondary-button">
           <ImagePlus size={17} />
           {busy ? `处理中 ${progress}%` : "上传照片"}
@@ -146,7 +140,6 @@ export function MediaPicker({
                 >
                   <img
                     src={mediaUrl(m.url)}
-                    crossOrigin="use-credentials"
                     alt={m.alt || m.filename}
                     loading="lazy"
                   />
@@ -251,7 +244,6 @@ export function AttachmentLibrary({
                   {m.mimeType.startsWith("image/") ? (
                     <img
                       src={mediaUrl(m.url)}
-                      crossOrigin="use-credentials"
                       alt={m.alt || m.filename}
                       loading="lazy"
                     />

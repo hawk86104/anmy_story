@@ -1,4 +1,4 @@
-import { get, set, del } from "idb-keyval";
+import { get, set, del, keys, delMany } from "idb-keyval";
 import type { EntryInput, Member } from "@mylife/shared";
 import type { Media } from "@mylife/shared";
 export interface Draft extends EntryInput {
@@ -17,6 +17,13 @@ export async function writeDraft(key: string, draft: Draft) {
 }
 export async function removeDraft(key: string) {
   return del(key);
+}
+export async function clearFamilyDrafts(familyId: string) {
+  const matching = (await keys()).filter(
+    (key) =>
+      typeof key === "string" && key.startsWith(`mylife:v1:${familyId}:`),
+  );
+  await delMany(matching);
 }
 export function snapshotDraft(
   form: EntryInput,

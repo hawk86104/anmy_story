@@ -6,8 +6,6 @@ import {
 } from "node:crypto";
 import { lookup } from "node:dns/promises";
 import { BlockList, isIP } from "node:net";
-import { readFile } from "node:fs/promises";
-import path from "node:path";
 import {
   addDataAndFileToRequest,
   APIError,
@@ -18,7 +16,7 @@ import type { AIConfiguration, AISuggestion } from "@mylife/shared";
 import type { FamilyService } from "../payload-types";
 import { member } from "./access";
 import { json } from "./public-entries";
-import { mediaRoot } from "../collections/Media";
+import { readMedia } from "./storage";
 import { originalProof } from "./ai-proof";
 
 const cryptoKey = () =>
@@ -391,9 +389,7 @@ export const aiEndpoints: Endpoint[] = [
           return json({ error: "只能转写自己可以访问的家庭录音。" }, 403);
         if ((m.filesize || 0) > 25 * 1024 * 1024)
           return json({ error: "这段录音超过 25 MB，请先分成较短片段。" }, 400);
-        const bytes = await readFile(
-            path.join(mediaRoot, path.basename(m.filename)),
-          ),
+        const bytes = await readMedia(m),
           form = new FormData();
         form.append("model", s.transcriptionModel);
         form.append(

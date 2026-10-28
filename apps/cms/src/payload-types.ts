@@ -74,6 +74,7 @@ export interface Config {
     projects: Project;
     'entry-history': EntryHistory;
     'family-services': FamilyService;
+    'storage-cleanup': StorageCleanup;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -88,6 +89,7 @@ export interface Config {
     projects: ProjectsSelect<false> | ProjectsSelect<true>;
     'entry-history': EntryHistorySelect<false> | EntryHistorySelect<true>;
     'family-services': FamilyServicesSelect<false> | FamilyServicesSelect<true>;
+    'storage-cleanup': StorageCleanupSelect<false> | StorageCleanupSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -218,6 +220,7 @@ export interface Entry {
  */
 export interface Media {
   id: number;
+  storage?: ('local' | 'cos') | null;
   alt?: string | null;
   preserveOriginal?: boolean | null;
   originalFilename?: string | null;
@@ -228,6 +231,8 @@ export interface Media {
   originalSize?: number | null;
   processingStatus?: ('ready' | 'queued' | 'processing' | 'failed') | null;
   processingError?: string | null;
+  prefix?: string | null;
+  _objectKey?: string | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -337,6 +342,19 @@ export interface FamilyService {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "storage-cleanup".
+ */
+export interface StorageCleanup {
+  id: number;
+  familyId: string;
+  objectKey: string;
+  storage: 'local' | 'cos';
+  original?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
@@ -386,6 +404,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'family-services';
         value: number | FamilyService;
+      } | null)
+    | ({
+        relationTo: 'storage-cleanup';
+        value: number | StorageCleanup;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -502,6 +524,7 @@ export interface EntriesSelect<T extends boolean = true> {
  * via the `definition` "media_select".
  */
 export interface MediaSelect<T extends boolean = true> {
+  storage?: T;
   alt?: T;
   preserveOriginal?: T;
   originalFilename?: T;
@@ -512,6 +535,8 @@ export interface MediaSelect<T extends boolean = true> {
   originalSize?: T;
   processingStatus?: T;
   processingError?: T;
+  prefix?: T;
+  _objectKey?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;
@@ -600,6 +625,18 @@ export interface FamilyServicesSelect<T extends boolean = true> {
   consentAt?: T;
   preserveOriginals?: T;
   lastExportAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "storage-cleanup_select".
+ */
+export interface StorageCleanupSelect<T extends boolean = true> {
+  familyId?: T;
+  objectKey?: T;
+  storage?: T;
+  original?: T;
   updatedAt?: T;
   createdAt?: T;
 }

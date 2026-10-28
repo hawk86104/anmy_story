@@ -75,11 +75,7 @@ export function ProjectWorkspace() {
               key={p.id}
             >
               {p.cover && typeof p.cover !== "number" ? (
-                <img
-                  src={mediaUrl(p.cover.url)}
-                  crossOrigin="use-credentials"
-                  alt={p.cover.alt || p.title}
-                />
+                <img src={mediaUrl(p.cover.url)} alt={p.cover.alt || p.title} />
               ) : (
                 <Usagi size={80} />
               )}

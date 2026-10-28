@@ -4,7 +4,7 @@ export default {
   distDir: process.env.NEXT_DIST_DIR || ".next",
   poweredByHeader: false,
   transpilePackages: ["@mylife/shared"],
-  experimental: { proxyClientMaxBodySize: "110mb" },
+  experimental: { proxyClientMaxBodySize: "1100mb" },
   ...(!directApi
     ? {
         async rewrites() {

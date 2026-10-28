@@ -153,6 +153,7 @@ export function EntryEditor({
   const recorder = useRef<MediaRecorder | null>(null);
   const stream = useRef<MediaStream | null>(null);
   const itemRef = useRef(items);
+  const recordCreatedAt = useRef(entry?.createdAt || new Date().toISOString());
   const savingRef = useRef(false);
   const savedRef = useRef(false);
   const objectUrls = useRef(new Set<string>());
@@ -162,10 +163,10 @@ export function EntryEditor({
     setForm((f) => ({ ...f, [key]: value }));
   const hasContent = Boolean(
     form.title.trim() ||
-      form.content.trim() ||
-      form.reflection.trim() ||
-      form.learning.trim() ||
-      items.length,
+    form.content.trim() ||
+    form.reflection.trim() ||
+    form.learning.trim() ||
+    items.length,
   );
   const busy = items.some(
     (i) => i.status === "uploading" || i.status === "compressing",
@@ -190,6 +191,7 @@ export function EntryEditor({
         item.file.size,
         item.imageKind,
         (n) => update({ progress: n }),
+        recordCreatedAt.current,
       );
       update({ status: "ready", progress: 100, media });
     } catch (e) {
@@ -886,7 +888,6 @@ export function EntryEditor({
                       item.media?.mimeType?.startsWith("image/") ? (
                         <img
                           src={item.preview || mediaUrl(item.media?.url)}
-                          crossOrigin="use-credentials"
                           alt={`素材 ${i + 1}`}
                         />
                       ) : (
