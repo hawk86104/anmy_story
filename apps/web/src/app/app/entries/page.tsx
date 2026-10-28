@@ -13,13 +13,13 @@ import {
 } from "lucide-react";
 import {
   ENTRY_TYPES,
-  entryTitle,
   displayDate,
   entryCover,
 } from "@mylife/shared";
 import type { Entry } from "@mylife/shared";
 import { api } from "@/lib/api";
 import { mediaUrl } from "@/lib/urls";
+import { markdownEntryTitle as entryTitle, markdownExcerpt } from "@/lib/markdown-text";
 export default function Timeline() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [type, setType] = useState("all");
@@ -195,7 +195,7 @@ export default function Timeline() {
                           {e.retrospective && <small>回忆补录</small>}
                         </span>
                         <h3>{entryTitle(e)}</h3>
-                        <p>{e.content.slice(0, 140)}</p>
+                        <p>{markdownExcerpt(e.content, 140)}</p>
                         <div className="entry-chips">
                           <span>
                             {ENTRY_TYPES.find((t) => t.value === e.type)?.label}

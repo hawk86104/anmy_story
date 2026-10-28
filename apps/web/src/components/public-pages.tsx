@@ -11,7 +11,6 @@ import {
 import {
   ENTRY_TYPES,
   displayDate,
-  entryTitle,
   entryCover,
   type GrowthProject,
   type PublicEntry,
@@ -23,6 +22,8 @@ import {
   type PageData,
 } from "@/lib/public-data";
 import { mediaUrl } from "@/lib/urls";
+import { markdownEntryTitle as entryTitle, markdownExcerpt } from "@/lib/markdown-text";
+import { MarkdownContent } from "./markdown-content";
 import { SiteShell } from "./site-shell";
 import { EmptyState, Usagi, themeAssets } from "./theme";
 import { EntryArtwork, EntryCard } from "./entry-card";
@@ -350,7 +351,7 @@ export async function PublicCollection({
                           {ENTRY_TYPES.find((t) => t.value === e.type)?.label}
                         </span>
                         <h3>{entryTitle(e)}</h3>
-                        <p>{e.content.slice(0, 100)}</p>
+                        <p>{markdownExcerpt(e.content, 100)}</p>
                         <span className="site-read-more">
                           阅读这段记忆 <ArrowRight size={14} />
                         </span>
@@ -583,7 +584,7 @@ export async function PublicMemory({ id }: { id: string }) {
               <MediaView media={entryCover(entry)!} />
             </div>
           )}
-          <div className="site-memory-content">{entry.content}</div>
+          <MarkdownContent className="site-memory-content" content={entry.content} />
           {entry.reflection && (
             <section className="reflection-block">
               <span>当时的心情</span>

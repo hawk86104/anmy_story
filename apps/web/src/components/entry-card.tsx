@@ -4,11 +4,11 @@ import {
   ENTRY_TYPES,
   displayDate,
   entryCover,
-  entryTitle,
   type Entry,
   type PublicEntry,
 } from "@mylife/shared";
 import { mediaUrl } from "@/lib/urls";
+import { markdownEntryTitle as entryTitle, markdownExcerpt } from "@/lib/markdown-text";
 
 export function EntryArtwork({ entry }: { entry: Entry | PublicEntry }) {
   const cover = entryCover(entry);
@@ -58,8 +58,7 @@ export function EntryCard({
         </div>
         <h3>{entryTitle(entry)}</h3>
         <p>
-          {entry.content.slice(0, 100)}
-          {entry.content.length > 100 ? "…" : ""}
+          {markdownExcerpt(entry.content, 100)}
         </p>
       </div>
     </Link>

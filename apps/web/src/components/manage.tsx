@@ -26,7 +26,8 @@ import {
   Video,
 } from "lucide-react";
 import type { Entry, Media, Member } from "@mylife/shared";
-import { displayDate, entryTitle } from "@mylife/shared";
+import { displayDate } from "@mylife/shared";
+import { markdownEntryTitle as entryTitle } from "@/lib/markdown-text";
 import { api, sizeLabel } from "@/lib/api";
 import { apiUrl, mediaUrl } from "@/lib/urls";
 import { prepareImage, uploadMedia } from "@/lib/media";
@@ -34,6 +35,7 @@ import { useSession } from "./session";
 import { draftKey, removeDraft } from "@/lib/drafts";
 import { EntryArtwork } from "./entry-card";
 import { EntryEditor } from "./entry-editor";
+import { MarkdownContent } from "./markdown-content";
 import { EmptyState } from "./theme";
 import { FamilyDataManagement } from "./family-data-management";
 
@@ -504,9 +506,7 @@ export function ManageRecord({ id }: { id: string }) {
         ) : (
           <section className="settings-panel">
             <h2>最初的表达，仍然在这里。</h2>
-            <p className="version-comparison">
-              {entry.originalText || "这段记录最初以素材开始。"}
-            </p>
+            <MarkdownContent className="version-comparison" content={entry.originalText || "这段记录最初以素材开始。"} />
             <h2>一路写来的样子</h2>
             {history.map((v) => (
               <details className="history-item" key={v.id}>
@@ -514,9 +514,7 @@ export function ManageRecord({ id }: { id: string }) {
                   版本 {v.revision} · {v.editorName}{" "}
                   <small>{new Date(v.createdAt).toLocaleString("zh-CN")}</small>
                 </summary>
-                <p className="version-comparison">
-                  {v.snapshot.content || "这一版记录以素材开始。"}
-                </p>
+                <MarkdownContent className="version-comparison" content={v.snapshot.content || "这一版记录以素材开始。"} />
                 <button
                   className="text-button"
                   onClick={async () => {

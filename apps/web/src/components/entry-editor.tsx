@@ -52,6 +52,9 @@ import { mediaUrl } from "@/lib/urls";
 import { prepareImage, uploadMedia } from "@/lib/media";
 import { AttachmentLibrary } from "./media-picker";
 import { AIAssistant } from "./ai-assistant";
+import { MarkdownEditor } from "./markdown-editor";
+import { MarkdownContent } from "./markdown-content";
+import { markdownExcerpt } from "@/lib/markdown-text";
 import { Usagi } from "./theme";
 import {
   draftKey,
@@ -713,7 +716,7 @@ export function EntryEditor({
           <details>
             <summary>对照最新保存的内容（版本 {conflict.revision}）</summary>
             <h3>{conflict.title || "未填写标题"}</h3>
-            <p>{conflict.content}</p>
+            <MarkdownContent content={conflict.content} />
             <p>
               发生时间：{displayDate(conflict)} · 附件{" "}
               {conflict.media?.length || 0} 份 ·{" "}
@@ -746,7 +749,7 @@ export function EntryEditor({
       {offlineDraft && (
         <section className="offline-recovery" aria-label="设备离线草稿">
           <strong>这台设备上还有一份离线草稿</strong>
-          <p>{offlineDraft.title || offlineDraft.content.slice(0, 160)}</p>
+          <p>{offlineDraft.title || markdownExcerpt(offlineDraft.content, 160)}</p>
           <p>带回后会与当前文字合并，先保持仅自己和家长可见。</p>
           <button
             className="secondary-button"
@@ -820,12 +823,11 @@ export function EntryEditor({
                         : "故事的名字（选填）"
                 }
               />
-              <textarea
-                className="entry-body-input"
-                aria-label="记录正文"
+              <MarkdownEditor
                 value={form.content}
                 maxLength={50000}
-                onChange={(e) => patch("content", e.target.value)}
+                disabled={saving}
+                onChange={(value) => patch("content", value)}
                 placeholder={placeholders[form.type]}
               />
               <div className="writing-bottom">

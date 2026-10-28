@@ -13,11 +13,13 @@ import {
   LoaderCircle,
 } from "lucide-react";
 import type { Entry, Media } from "@mylife/shared";
-import { displayDate, entryTitle, ENTRY_TYPES } from "@mylife/shared";
+import { displayDate, ENTRY_TYPES } from "@mylife/shared";
+import { markdownEntryTitle as entryTitle } from "@/lib/markdown-text";
 import { api } from "@/lib/api";
 import { useSession } from "@/components/session";
 import { MediaView } from "@/components/media-view";
 import { EntryEditor } from "@/components/entry-editor";
+import { MarkdownContent } from "@/components/markdown-content";
 export default function EntryPage({
   params,
 }: {
@@ -177,7 +179,7 @@ export default function EntryPage({
             </button>
           )}
         </div>
-        <div className="detail-content">{entry.content}</div>
+        <MarkdownContent className="detail-content" content={entry.content} />
         {entry.reflection && (
           <section className="reflection-block">
             <span>那时候，我觉得…</span>
@@ -214,7 +216,7 @@ export default function EntryPage({
         )}
         <details className="original-expression">
           <summary>最初的表达，一直都在</summary>
-          <p>{entry.originalText || "这段记忆最初以素材开始。"}</p>
+          <MarkdownContent content={entry.originalText || "这段记忆最初以素材开始。"} />
           <small>
             首次保存于 {new Date(entry.createdAt).toLocaleString("zh-CN")}
           </small>
@@ -306,7 +308,7 @@ export default function EntryPage({
                 </span>
                 {new Date(v.createdAt).toLocaleString("zh-CN")}
               </summary>
-              <p>{v.version.content || "这版记录以素材开始。"}</p>
+              <MarkdownContent content={v.version.content || "这版记录以素材开始。"} />
             </details>
           ))}
         </section>

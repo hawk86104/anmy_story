@@ -80,6 +80,37 @@ test("并发记录保护与外部历史资料导入", { timeout: 120000 }, async
         user: child,
       });
 
+    await t.test("Markdown 正文按原文保存，并保留公开快照和历史版本", async () => {
+      const original = "# 一次旅行\n\n**开心**\n\n- 出发\n- 回家\n\n[照片](https://example.com/)";
+      const next = `${original}\n\n> 值得记住的一天`;
+      const created = await payload.create({
+        collection: "entries",
+        user: child,
+        overrideAccess: false,
+        data: {
+          type: "story", content: original, clientId: randomUUID(),
+          datePrecision: "unknown", status: "saved", visibility: "public",
+          familyId: family, author: child.id,
+        },
+      });
+      assert.equal(created.content, original);
+      assert.equal(created.originalText, original);
+      assert.equal((created.publicSnapshot as { content: string }).content, original);
+      const updated = await payload.update({
+        collection: "entries", id: created.id, user: child, overrideAccess: false,
+        data: { content: next, revision: created.revision },
+      });
+      assert.equal(updated.content, next);
+      assert.equal(updated.originalText, original);
+      assert.equal((updated.publicSnapshot as { content: string }).content, next);
+      const history = await payload.find({
+        collection: "entry-history", where: { entry: { equals: created.id } },
+        pagination: false, overrideAccess: true, depth: 0,
+      });
+      assert.equal((history.docs.find((item) => item.revision === 1)!.snapshot as { content: string }).content, original);
+      assert.equal((history.docs.find((item) => item.revision === 2)!.snapshot as { content: string }).content, next);
+    });
+
     await t.test(
       "同时保存同一版本只有一个成功；正文、公开快照与历史来自同一次写入",
       async () => {
