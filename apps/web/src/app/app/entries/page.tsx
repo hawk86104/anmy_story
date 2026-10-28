@@ -219,7 +219,6 @@ export default function Timeline() {
                         <img
                           className="timeline-thumbnail"
                           src={mediaUrl(photo.url)}
-                          crossOrigin="use-credentials"
                           alt={photo.alt || "记录照片"}
                           loading="lazy"
                         />

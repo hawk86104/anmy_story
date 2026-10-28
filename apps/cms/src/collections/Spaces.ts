@@ -28,6 +28,7 @@ export const Spaces: CollectionConfig = {
     beforeChange: [
       async ({ data, req, originalDoc }) => {
         const u = member(req);
+        const restoredOwner = relationId(data.owner);
         if (!u) throw new APIError("请先登录。", 401);
         data.familyId = originalDoc?.familyId || u.familyId;
         data.owner = originalDoc?.owner ? relationId(originalDoc.owner) : u.id;
@@ -47,6 +48,27 @@ export const Spaces: CollectionConfig = {
             req,
           });
           data.owner = children.docs[0]?.id || u.id;
+        }
+        if (
+          req.context.restoreArchive &&
+          u.role === "parent" &&
+          !originalDoc?.id &&
+          restoredOwner
+        ) {
+          const owner = await req.payload.find({
+            collection: "users",
+            where: {
+              and: [
+                { id: { equals: restoredOwner } },
+                { familyId: { equals: u.familyId } },
+              ],
+            },
+            depth: 0,
+            limit: 1,
+            overrideAccess: true,
+            req,
+          });
+          if (owner.docs[0]) data.owner = owner.docs[0].id;
         }
         const ids = [
           relationId(data.avatar ?? originalDoc?.avatar),

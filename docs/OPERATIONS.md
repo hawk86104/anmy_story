@@ -8,8 +8,12 @@
 | -------------------------- | ------------------------------------------------------- |
 | PAYLOAD_SECRET             | 至少 32 位随机认证密钥，正式环境独立配置                |
 | DATABASE_URL               | 默认 `file:./data/mylife.db`，相对后台工作目录          |
-| MEDIA_ROOT                 | 默认后台 `./media`，必须持久化并定期备份                |
-| ORIGINALS_ROOT             | 默认 MEDIA_ROOT 加 `-originals`，私有原件目录，纳入备份 |
+| MEDIA_ROOT                 | 默认后台 `./media`，读取旧素材；COS 模式新上传不落盘    |
+| ORIGINALS_ROOT             | 迁移前的旧原件目录，新原件也存入 COS 日期目录           |
+| MEDIA_STORAGE              | 日常及正式部署使用 `cos`；隔离离线测试使用 `local`       |
+| COS_SECRET_ID / COS_SECRET_KEY | 仅服务端环境配置的 COS 凭据                          |
+| COS_BUCKET / COS_REGION / COS_CDN_ORIGIN | 存储桶、区域与 CDN 源地址                  |
+| MAX_BACKUP_MB / MAX_BACKUP_EXPANDED_MB | ZIP 上传/解压上限，默认 1024 / 4096 MB     |
 | FFMPEG_PATH / FFPROBE_PATH | 可选，转码工具不在 PATH 时指定绝对路径                  |
 | SITE_FAMILY_ID             | 可选，多个家庭时指定公开主页的家庭；默认首份主页资料    |
 | WEB_ORIGIN                 | 前台完整源地址，正式环境使用 HTTPS                      |
@@ -38,7 +42,7 @@
 
 备份 SQLite（含一致性处理）、整个媒体目录、上传原件目录与正式配置；密钥另行安全保存。完整快照前停止 CMS 和媒体消费者，使用 SQLite `.backup` 并复制媒体，具体命令见[宝塔更新](DEPLOY_TENCENT.md#9-已部署站点的版本更新与回滚)。不要只复制正在写入的 `.db` 文件。
 
-手机家长端 `/app/manage/ai` 提供 ZIP / JSON 导出。ZIP 解压后可直接阅读 Markdown，并包含记录、项目、可用版本、媒体与缺失报告；不含登录密码及服务密钥。本站档案恢复命令默认只检查，步骤见[本版说明](USAGI_ITERATION.md)。已在临时数据库完成真实 ZIP 导出、解压和重新导入验证，生产环境仍需单独演练。定时异地备份和对象存储尚未接入。
+家长端 `/app/manage/settings` 与 Payload 后台首页提供完整 ZIP 备份、预检、整体还原和清空功能。ZIP 包含实际 COS 附件、原件、记录、可用历史、项目、主页、成员资料与设置（包括 AI 服务密钥），不含登录密码或服务器环境密钥。请私密保管。旧版命令行仍用于增量导入，默认只检查且保持私密。COS 配置、迁移和完整还原详见 [COS 与完整备份](COS_BACKUP.md)。定时异地备份仍需另行配置。
 
 AI 默认关闭。家长填写兼容服务的公网 HTTPS 根地址、模型与密钥并授权后，孩子才能主动使用整理或转写；用户实际服务尚未配置验收。PAYLOAD_SECRET 用于认证和加密服务密钥，更新时保持不变。原件策略只作用于之后的新上传，不会补回已经丢失的旧原件。
 

@@ -1,3 +1,4 @@
+process.env.MEDIA_STORAGE = "local";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -26,9 +27,8 @@ test("并发记录保护与外部历史资料导入", { timeout: 120000 }, async
   const { default: config } = await import("../payload.config");
   const payload = await getPayload({ config });
   const { migrations } = await import("../migrations");
-  const { historyImportEndpoints, parseHistoryCSV } = await import(
-    "../lib/history-import"
-  );
+  const { historyImportEndpoints, parseHistoryCSV } =
+    await import("../lib/history-import");
   const family = randomUUID();
   const user = (role: "parent" | "child", familyId = family) =>
     payload.create({
@@ -432,6 +432,11 @@ test("并发记录保护与外部历史资料导入", { timeout: 120000 }, async
     );
   } finally {
     await closePayload(payload);
-    await rm(temp, { recursive: true, force: true });
+    await rm(temp, {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 100,
+    });
   }
 });

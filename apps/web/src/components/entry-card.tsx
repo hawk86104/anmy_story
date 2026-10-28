@@ -20,7 +20,6 @@ export function EntryArtwork({ entry }: { entry: Entry | PublicEntry }) {
     <img
       className="entry-artwork"
       src={mediaUrl(cover.url)}
-      crossOrigin="use-credentials"
       alt={cover.alt || entryTitle(entry)}
       loading="lazy"
     />

@@ -43,34 +43,16 @@ export function MediaView({
   if (media.mimeType?.startsWith("image/"))
     return (
       <a href={url} target="_blank" rel="noreferrer">
-        <img
-          src={url}
-          crossOrigin="use-credentials"
-          alt={media.alt || "成长记录照片"}
-          loading="lazy"
-        />
+        <img src={url} alt={media.alt || "成长记录照片"} loading="lazy" />
       </a>
     );
   if (media.mimeType?.startsWith("video/"))
-    return (
-      <video
-        src={url}
-        crossOrigin="use-credentials"
-        controls
-        playsInline
-        preload="metadata"
-      />
-    );
+    return <video src={url} controls playsInline preload="metadata" />;
   if (media.mimeType?.startsWith("audio/"))
     return (
       <div className="audio-player">
         <span>留住当时的声音</span>
-        <audio
-          src={url}
-          crossOrigin="use-credentials"
-          controls
-          preload="metadata"
-        />
+        <audio src={url} controls preload="metadata" />
       </div>
     );
   return (

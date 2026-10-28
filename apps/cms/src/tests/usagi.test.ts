@@ -1,3 +1,4 @@
+process.env.MEDIA_STORAGE = "local";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -88,7 +89,7 @@ test(
       await t.test(
         "生产模式从前一版 SQLite 迁移，原文、公开快照和版本号保留，重复迁移无变化",
         async () => {
-          await payload.db.migrate({ migrations: migrations.slice(0, -1) });
+          await payload.db.migrate({ migrations: migrations.slice(0, 3) });
           parent = await createUser("parent@usagi.invalid", "parent");
           child = await createUser("child@usagi.invalid", "child");
           const db = (payload.db as unknown as SQLiteAdapter).client;
@@ -166,15 +167,19 @@ test(
       const { familyEndpoints } = await import("../lib/family-endpoints");
       const { publicEntryEndpoints } = await import("../lib/public-entries");
       const ai = await import("../lib/ai");
-      const { originalProof, verifiedOriginal } = await import(
-        "../lib/ai-proof"
-      );
+      const { originalProof, verifiedOriginal } =
+        await import("../lib/ai-proof");
       const archive = await import("../lib/archive");
       const { restoreFamilyArchive } = await import("../lib/restore");
-      const { Media, mediaRoot, originalsRoot } = await import(
-        "../collections/Media"
-      );
+      const { Media, mediaRoot, originalsRoot } =
+        await import("../collections/Media");
       const { mediaReferences } = await import("../lib/media-links");
+      const {
+        originalLocation,
+        localMediaPath,
+        mediaKey,
+        flushStorageDeletes,
+      } = await import("../lib/storage");
       const photo = await sharp({
         create: { width: 24, height: 18, channels: 3, background: "#f6ce55" },
       })
@@ -259,12 +264,9 @@ test(
             overrideAccess: true,
           });
           assert.ok(raw.originalFilename);
-          assert.deepEqual(
-            await readFile(path.join(originalsRoot, raw.originalFilename!)),
-            photo,
-          );
+          assert.deepEqual(await readFile(originalLocation(raw).local), photo);
           assert.notDeepEqual(
-            await readFile(path.join(mediaRoot, raw.filename!)),
+            await readFile(localMediaPath(mediaKey(raw))),
             photo,
           );
           assert.equal(
@@ -649,7 +651,7 @@ test(
         },
       );
       await t.test(
-        "流式 ZIP 含原文件、Markdown、历史和缺失报告；排除其他家庭与服务密钥；可检查和恢复为私密记录",
+        "流式 ZIP 含原文件、Markdown、历史、设置和缺失报告；排除其他家庭；旧版增量恢复保持私密",
         async () => {
           await assert.rejects(
             archive.createFamilyArchive(
@@ -659,7 +661,7 @@ test(
           const req = await createLocalReq({ user: parent }, payload);
           const { dataset, files } = await archive.createFamilyArchive(req);
           assert.equal(dataset.members.length, 3);
-          assert.ok(!JSON.stringify(dataset).includes("test-secret-not-real"));
+          assert.equal(dataset.settings?.apiKey, "test-secret-not-real");
           assert.ok(
             !JSON.stringify(dataset).includes("stranger@usagi.invalid"),
           );
@@ -749,16 +751,15 @@ test(
             id: m.id,
             overrideAccess: true,
           });
-          await access(path.join(originalsRoot, raw.originalFilename!));
+          await access(originalLocation(raw).local);
           await payload.delete({
             collection: "media",
             id: m.id,
             user: parent,
             overrideAccess: false,
           });
-          await assert.rejects(
-            access(path.join(originalsRoot, raw.originalFilename!)),
-          );
+          assert.equal((await flushStorageDeletes(payload, family)).pending, 0);
+          await assert.rejects(access(originalLocation(raw).local));
           await assert.rejects(
             payload.update({
               collection: "users",

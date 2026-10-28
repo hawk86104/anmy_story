@@ -44,6 +44,7 @@ export function uploadMedia(
   originalSize: number,
   imageKind: string,
   onProgress: (progress: number) => void,
+  recordCreatedAt?: string,
 ): Promise<Media> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -76,7 +77,12 @@ export function uploadMedia(
     const body = new FormData();
     body.append(
       "_payload",
-      JSON.stringify({ alt: file.name, originalSize, imageKind }),
+      JSON.stringify({
+        alt: file.name,
+        originalSize,
+        imageKind,
+        recordCreatedAt,
+      }),
     );
     body.append("file", file);
     xhr.send(body);

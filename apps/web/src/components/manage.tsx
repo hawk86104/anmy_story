@@ -35,6 +35,7 @@ import { draftKey, removeDraft } from "@/lib/drafts";
 import { EntryArtwork } from "./entry-card";
 import { EntryEditor } from "./entry-editor";
 import { EmptyState } from "./theme";
+import { FamilyDataManagement } from "./family-data-management";
 
 const links = [
   { href: "/app/manage", label: "概览", icon: LayoutGrid },
@@ -691,7 +692,6 @@ export function ManageMedia() {
               <img
                 className="entry-artwork"
                 src={mediaUrl(m.url)}
-                crossOrigin="use-credentials"
                 alt={m.alt || m.filename}
                 loading="lazy"
               />
@@ -971,31 +971,34 @@ export function ManageMembers() {
 }
 export function ManageSettings() {
   return (
-    <div className="manage-links">
-      <ManageLink
-        href="/app/profile"
-        icon={Users}
-        title="公开资料与头像封面"
-        note="自己的简介、兴趣与主页照片"
-      />
-      <ManageLink
-        href="/app/manage/themes"
-        icon={Palette}
-        title="主题与主页模块"
-        note="选择喜欢的色彩与公开展示入口"
-      />
-      <ManageLink
-        href="/app/manage/members"
-        icon={Users}
-        title="家庭成员"
-        note="独立账号，家长与孩子各有分工"
-      />
-      <ManageLink
-        href="/app/manage/ai"
-        icon={Sparkles}
-        title="AI 与长期保存"
-        note="配置服务、查看授权、导出家庭档案"
-      />
-    </div>
+    <>
+      <div className="manage-links">
+        <ManageLink
+          href="/app/profile"
+          icon={Users}
+          title="公开资料与头像封面"
+          note="自己的简介、兴趣与主页照片"
+        />
+        <ManageLink
+          href="/app/manage/themes"
+          icon={Palette}
+          title="主题与主页模块"
+          note="选择喜欢的色彩与公开展示入口"
+        />
+        <ManageLink
+          href="/app/manage/members"
+          icon={Users}
+          title="家庭成员"
+          note="独立账号，家长与孩子各有分工"
+        />
+        <ManageLink
+          href="/app/manage/ai"
+          icon={Sparkles}
+          title="AI 与长期保存"
+          note="配置服务、查看授权、导出家庭档案"
+        />
+      </div>
+      <FamilyDataManagement />
+    </>
   );
 }

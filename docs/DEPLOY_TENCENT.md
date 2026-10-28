@@ -73,6 +73,16 @@ NODE_ENV=production
 PAYLOAD_SECRET=填入一次生成的随机密钥
 DATABASE_URL=file:/www/wwwroot/anmy_story/db/mylife.db
 MEDIA_ROOT=/www/wwwroot/anmy_story/media
+MEDIA_STORAGE=cos
+COS_APP_ID=100000838747
+COS_SECRET_ID=填写服务端凭据
+COS_SECRET_KEY=填写服务端凭据
+COS_BUCKET=anmy-story-1253949117
+COS_REGION=ap-nanjing
+COS_DOMAIN=anmy-story-1253949117.cos.ap-nanjing.myqcloud.com
+COS_CDN_ORIGIN=https://anmy-story.icegl.cn
+MAX_BACKUP_MB=1024
+MAX_BACKUP_EXPANDED_MB=4096
 ORIGINALS_ROOT=/www/wwwroot/anmy_story/media-originals
 MEDIA_WORKER_LOCK=/www/wwwroot/anmy_story/media-worker.lock
 WEB_ORIGIN=https://anmy.icegl.cn
@@ -97,7 +107,7 @@ NODE_ENV=production npm run seed
 npm run build --workspace @mylife/cms
 ```
 
-先建表再建账号。不要在生产目录运行 `npm run dev` 触发开发模式的自动结构 push。数据库只保存账号、记录、关系、版本和文件元信息；图片/视频的文件本体在独立素材目录。
+先建表再建账号。不要在生产目录运行 `npm run dev` 触发开发模式的自动结构 push。数据库保存账号、记录、关系、版本和文件元信息，附件本体统一存入 COS。升级旧站点时还需在服务器执行旧素材迁移，步骤见 [COS 与完整备份](COS_BACKUP.md)。
 
 SQLite 适合当前一个家庭、一个 CMS 实例的阶段。不要使用 PM2 cluster 启动多个 CMS 实例。后续若需要多实例或更大协作规模，可规划 PostgreSQL 迁移；不能只把当前 `DATABASE_URL` 换成 MySQL 地址。
 
@@ -207,6 +217,8 @@ node scripts/verify-deployment.mjs \
 
 ### 9.2 新功能版本的发布顺序
 
+2026-10-28 的 COS 日期目录、清空和完整备份更新，优先按 [本地测试与宝塔升级步骤](UPDATE_20261028_COS_BACKUP.md) 操作：本次需要增加 COS 配置、执行 `20261028_021906_media_cos_backup` 迁移，并迁移服务器旧附件。下面保留早前版本的更新说明供参考。
+
 这次新增了成长主页、项目、长期历史、家庭服务设置，记录增加封面与项目关系，素材增加原件信息；迁移文件为 `20261026_085202_usagi_theme`。原账号和成长内容继续使用，不运行 `setup`、`seed` 或数据库重置。
 
 2026-10-27 的并发保护、历史导入与 PWA 更新没有新增表结构，操作步骤见 [Roadmap 迭代说明](ROADMAP_ITERATION.md)。旧版升级仍需完成下述乌萨奇迁移。
@@ -288,7 +300,7 @@ npm run build --workspace @mylife/cms
 
 **现有 `.env`、PAYLOAD_SECRET、数据库和媒体保持原值、原位置。** 不复制本地 `.env` 或本地测试库到服务器，不用模板覆盖正式配置。PAYLOAD_SECRET 还用于加密新版本的 AI 密钥，重新随机生成会使登录失效且已有 AI 密钥无法解密。
 
-本轮无需新增必填配置。若希望明确指定上传原件目录，可只追加这一项，路径所有者与 PM2 用户一致：
+早前乌萨奇版本本身无需新增必填配置；2026-10-28 的 COS 更新需要按上述新步骤补齐 COS 环境变量。若希望明确指定旧上传原件目录，可追加这一项，路径所有者与 PM2 用户一致：
 
 ```dotenv
 ORIGINALS_ROOT=/www/wwwroot/anmy_story/media-originals
@@ -312,7 +324,7 @@ curl -f 'https://story.icegl.cn/api/public/projects?limit=1'
 pm2 save
 ```
 
-两个进程都应为 online；后两个接口返回 JSON，空项目列表也正常。已有的 Nginx 反代、域名和 HTTPS 通常不需要重配。本次 AI 请求最长 90 秒、ZIP 流式导出使用现有 300 秒代理读取超时；不要给后台 API 和下载接口加 CDN 强制缓存。整个服务继续使用一个 CMS 实例，不启用 PM2 cluster。
+两个进程都应为 online；后两个接口返回 JSON，空项目列表也正常。当前完整备份版本还需按 `deploy/tencent/nginx-cms.conf` 更新请求体与读取超时（默认 1100m、1800s），保留已有域名、HTTPS 和反代。后台 API 和下载接口遵循 no-store。整个服务继续使用一个 CMS 实例，不启用 PM2 cluster。
 
 数据库、备份、上传原件和 `.env` 不应直接暴露为网站静态文件。你目前把数据放在仓库路径下，需保留“全路径代理给 Node、无媒体 alias、无静态扩展名直读”的站点配置；不要用宝塔的静态目录浏览来提供这些文件。
 
@@ -357,9 +369,9 @@ node scripts/verify-deployment.mjs \
 3. 把当前数据库及其 `-wal` / `-shm` 一并移出原目录，再将 `$BACKUP/db/mylife.db` 复制回原 DATABASE_URL；按同一份备份恢复媒体、原件和正式配置，避免把旧库与新文件混用。
 4. 以旧代码重新构建 CMS，重启 PM2；验证旧记录和媒体。EO 切回对应的旧成功部署或重新部署旧提交。
 
-若升级后已经产生新记录，先保存新数据，优先修复问题；直接用旧备份覆盖会丢失这些新内容。日常家庭 ZIP 可用于独立家庭内容恢复，命令见 [乌萨奇版本说明](USAGI_ITERATION.md)，它不包含密码和 AI 凭据，不能替代服务器数据库、文件和密钥的一致备份。
+若升级后已经产生新记录，先保存新数据，优先修复问题；直接用旧备份覆盖会丢失这些新内容。当前家庭 ZIP 包含家庭资料与 AI 设置及凭据，不包含登录密码和服务器环境密钥，不能替代服务器级一致备份。增量导入见 [乌萨奇版本说明](USAGI_ITERATION.md)，整体还原见 [COS 与完整备份](COS_BACKUP.md)。
 
-目前媒体保存在服务器磁盘。COS、自动服务器发布和定时异地备份仍是独立后续工作。
+当前附件已支持 COS；旧服务器磁盘附件需要执行迁移。自动服务器发布和定时异地备份仍需另行配置。
 
 ## 官方依据
 

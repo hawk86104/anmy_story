@@ -142,11 +142,7 @@ export async function PublicHome() {
         <section className="site-profile">
           <div className="site-avatar">
             {profile.avatar ? (
-              <img
-                src={mediaUrl(profile.avatar.url)}
-                crossOrigin="use-credentials"
-                alt="公开头像"
-              />
+              <img src={mediaUrl(profile.avatar.url)} alt="公开头像" />
             ) : (
               <Usagi size={76} />
             )}
@@ -397,7 +393,6 @@ function ProjectCard({ project: p }: { project: GrowthProject }) {
       {p.cover && typeof p.cover !== "number" ? (
         <img
           src={mediaUrl(p.cover.url)}
-          crossOrigin="use-credentials"
           alt={p.cover.alt || p.title}
           loading="lazy"
         />
@@ -503,7 +498,6 @@ export async function PublicProjectDetail({ id }: { id: string }) {
           {project.cover && typeof project.cover !== "number" ? (
             <img
               src={mediaUrl(project.cover.url)}
-              crossOrigin="use-credentials"
               alt={project.cover.alt || project.title}
             />
           ) : (

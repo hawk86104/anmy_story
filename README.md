@@ -36,6 +36,10 @@ docs/               实施顺序、架构、运行与验证说明
 
 现已补齐记录的数据库原子版本保护、家长端 CSV / JSON 历史文字批量导入，以及可安装的离线记事外壳。使用入口与本地 / 宝塔更新步骤见 [Roadmap 迭代说明](docs/ROADMAP_ITERATION.md)。
 
+附件统一存入 COS 的 `media/记录创建日期/`，经 `anmy-story.icegl.cn` 的临时签名地址访问。家长设置页与 Payload 后台首页提供完整 ZIP 备份、预检与整体还原、清空所有历史记录和素材。部署配置、旧素材迁移与备份边界见 [COS 与完整备份](docs/COS_BACKUP.md)。
+
+本次更新的日常调试、临时测试库、上传/备份/清空/还原验收、宝塔迁移和 EO 发布命令见 [本地测试与宝塔升级步骤](docs/UPDATE_20261028_COS_BACKUP.md)。
+
 ## 本地运行
 
 统一使用 Node.js **24.18.0**、npm、系统 FFmpeg 和 FFprobe。可用 `.nvmrc` 选择版本，CI 同样读取该文件。Ubuntu/Debian 可安装 `ffmpeg` 包，macOS 可使用 `brew install ffmpeg`。
