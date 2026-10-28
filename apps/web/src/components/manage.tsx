@@ -9,6 +9,7 @@ import {
   BookOpen,
   Check,
   Download,
+  FileUp,
   FolderHeart,
   History,
   Image,
@@ -39,6 +40,7 @@ const links = [
   { href: "/app/manage", label: "概览", icon: LayoutGrid },
   { href: "/app/manage/entries", label: "记录", icon: BookOpen },
   { href: "/app/manage/media", label: "素材", icon: Image },
+  { href: "/app/manage/import", label: "导入", icon: FileUp },
   { href: "/app/manage/members", label: "成员", icon: Users },
   { href: "/app/manage/themes", label: "主题", icon: Palette },
   { href: "/app/manage/settings", label: "设置", icon: Settings },
@@ -190,6 +192,12 @@ export function ManageOverview() {
           icon={Users}
           title="家庭成员"
           note="孩子和家长，使用各自的账号"
+        />
+        <ManageLink
+          href="/app/manage/import"
+          icon={FileUp}
+          title="导入以前的文字资料"
+          note="CSV / JSON 预览、识别重复，再收进家庭空间"
         />
         <ManageLink
           href="/app/manage/themes"

@@ -16,6 +16,8 @@ import { publicEntryEndpoints } from "./lib/public-entries";
 import { familyEndpoints } from "./lib/family-endpoints";
 import { aiEndpoints, familyService, serviceDTO } from "./lib/ai";
 import { archiveEndpoints } from "./lib/archive";
+import { withEntryConcurrency } from "./lib/entry-concurrency";
+import { historyImportEndpoints } from "./lib/history-import";
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const webOrigin = process.env.WEB_ORIGIN || "http://localhost:3000";
 const cmsOrigin = process.env.CMS_ORIGIN || "http://localhost:3001";
@@ -43,13 +45,17 @@ export default buildConfig({
     FamilyServices,
   ],
   sharp,
-  db: sqliteAdapter({
-    client: { url: process.env.DATABASE_URL || "file:./data/mylife.db" },
-    push:
-      process.env.NODE_ENV !== "production" &&
-      process.env.MYLIFE_MANAGED_SCHEMA !== "true" &&
-      process.env.MYLIFE_MEDIA_WORKER !== "true",
-  }),
+  db: withEntryConcurrency(
+    sqliteAdapter({
+      client: { url: process.env.DATABASE_URL || "file:./data/mylife.db" },
+      transactionOptions: { behavior: "immediate" },
+      wal: true,
+      push:
+        process.env.NODE_ENV !== "production" &&
+        process.env.MYLIFE_MANAGED_SCHEMA !== "true" &&
+        process.env.MYLIFE_MEDIA_WORKER !== "true",
+    }),
+  ),
   upload: {
     limits: {
       fileSize:
@@ -85,5 +91,6 @@ export default buildConfig({
     ...familyEndpoints,
     ...aiEndpoints,
     ...archiveEndpoints,
+    ...historyImportEndpoints,
   ],
 });

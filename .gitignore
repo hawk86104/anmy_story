@@ -24,3 +24,4 @@ playwright-report/
 /media-originals/
 /backups/
 /media-worker.lock
+/apps/web/public/sw.js

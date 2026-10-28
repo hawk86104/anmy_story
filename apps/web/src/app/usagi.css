@@ -2893,3 +2893,147 @@ input[type="checkbox"] {
     transform: none;
   }
 }
+/* Historical imports and the small offline entry point share the current theme. */
+.import-workspace .notice.error {
+  color: #a33c31;
+  background: #fff0ec;
+  padding: 14px;
+  border-radius: 12px;
+}
+.import-workspace {
+  display: grid;
+  gap: 20px;
+  max-width: 900px;
+}
+.import-panel {
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: var(--paper);
+  padding: clamp(18px, 3vw, 28px);
+}
+.import-panel h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 21px;
+  margin-top: 0;
+}
+.import-panel p {
+  line-height: 1.8;
+}
+.import-form {
+  display: grid;
+  gap: 18px;
+  margin-top: 24px;
+}
+.import-form label {
+  display: grid;
+  gap: 8px;
+  font-weight: 600;
+  min-width: 0;
+}
+.import-form label small {
+  font-weight: 400;
+}
+.import-form input,
+.import-form select,
+.import-form textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--paper);
+  color: var(--ink);
+}
+.import-form textarea {
+  line-height: 1.7;
+  resize: vertical;
+  font-weight: 400;
+}
+.import-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+.import-preview {
+  display: grid;
+  gap: 12px;
+  margin: 20px 0;
+  max-height: 560px;
+  overflow: auto;
+}
+.import-row {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+  overflow-wrap: anywhere;
+}
+.import-row > div {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.import-row span,
+.import-row small {
+  font-size: 12px;
+  color: var(--muted);
+}
+.import-row p {
+  margin: 8px 0;
+  white-space: pre-wrap;
+}
+.import-row.error {
+  border-color: #b04b3d;
+}
+.import-row.error span {
+  color: #a33c31;
+}
+.import-row.duplicate {
+  opacity: 0.7;
+}
+.pwa-tools {
+  margin: 12px clamp(16px, 4vw, 48px) 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.pwa-tools > div {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.pwa-tools p {
+  margin: 8px 0;
+  line-height: 1.7;
+}
+.offline-recovery {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--paper);
+  padding: 18px;
+  margin: 14px 0;
+  overflow-wrap: anywhere;
+}
+.offline-recovery p {
+  line-height: 1.8;
+  white-space: pre-wrap;
+}
+.conflict-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+@media (max-width: 600px) {
+  .import-fields {
+    grid-template-columns: 1fr;
+  }
+  .import-row > div {
+    display: block;
+  }
+  .import-row span {
+    display: block;
+    margin-top: 6px;
+  }
+}
