@@ -28,6 +28,9 @@
     "@esbuild-kit/core-utils": {
       "esbuild": "0.25.12"
     },
+    "@payloadcms/graphql": {
+      "graphql-scalars": "2.0.1"
+    },
     "dompurify": "3.4.17"
   },
   "allowScripts": {
