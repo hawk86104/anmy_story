@@ -11,6 +11,7 @@ import {
   Flag,
   UserRound,
   FolderHeart,
+  FilePenLine,
 } from "lucide-react";
 import { ENTRY_TYPES, type Entry } from "@mylife/shared";
 import { useSession } from "@/components/session";
@@ -109,6 +110,10 @@ export default function Dashboard() {
         </div>
       </div>
       <div className="app-shortcuts">
+        <Link className="secondary-button" href="/app/drafts">
+          <FilePenLine size={16} />
+          我的草稿
+        </Link>
         <Link className="secondary-button" href="/app/projects">
           <FolderHeart size={16} />
           我的小计划

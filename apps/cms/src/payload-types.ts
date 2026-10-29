@@ -280,6 +280,18 @@ export interface Space {
       }[]
     | null;
   /**
+   * 记录编辑器中的常用标签。也可以在手机家长后台的标签管理中维护；移除选项不会删除旧记录上的标签。
+   */
+  entryTagOptions?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  /**
    * 选择后，游客可以查看这张头像。
    */
   avatar?: (number | null) | Media;
@@ -564,6 +576,7 @@ export interface SpacesSelect<T extends boolean = true> {
         label?: T;
         id?: T;
       };
+  entryTagOptions?: T;
   avatar?: T;
   cover?: T;
   theme?: T;

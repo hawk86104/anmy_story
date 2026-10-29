@@ -136,6 +136,11 @@ export default function EntryPage({
                 ? "这段记忆已经公开，所有人（包括游客）都能查看。"
                 : "已经留在家庭空间，只有你和家长可以查看。"}
             </p>
+            {entry.status === "draft" && (
+              <Link className="text-button" href="/app/drafts">
+                查看我的草稿
+              </Link>
+            )}
           </div>
           <button aria-label="关闭保存提示" onClick={() => setSaved(false)}>
             ×
@@ -216,7 +221,9 @@ export default function EntryPage({
         )}
         <details className="original-expression">
           <summary>最初的表达，一直都在</summary>
-          <MarkdownContent content={entry.originalText || "这段记忆最初以素材开始。"} />
+          <MarkdownContent
+            content={entry.originalText || "这段记忆最初以素材开始。"}
+          />
           <small>
             首次保存于 {new Date(entry.createdAt).toLocaleString("zh-CN")}
           </small>
@@ -308,7 +315,9 @@ export default function EntryPage({
                 </span>
                 {new Date(v.createdAt).toLocaleString("zh-CN")}
               </summary>
-              <MarkdownContent content={v.version.content || "这版记录以素材开始。"} />
+              <MarkdownContent
+                content={v.version.content || "这版记录以素材开始。"}
+              />
             </details>
           ))}
         </section>

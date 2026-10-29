@@ -62,6 +62,7 @@ import {
   writeDraft,
   removeDraft,
   snapshotDraft,
+  draftFingerprint,
 } from "@/lib/drafts";
 
 interface UploadItem {
@@ -127,12 +128,17 @@ export function EntryEditor({
   const router = useRouter();
   const [form, setForm] = useState<EntryInput>(() => initial(entry));
   const [projects, setProjects] = useState<GrowthProject[]>([]);
+  const [tagOptions, setTagOptions] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState("");
+  const [tagMessage, setTagMessage] = useState("");
+  const [tagLoadError, setTagLoadError] = useState(false);
   const [items, setItems] = useState<UploadItem[]>(
     () =>
       entry?.media
         ?.filter((m): m is Media => typeof m !== "number")
         .map(mapMedia) || [],
   );
+  const initialFingerprint = useRef(draftFingerprint(form, items));
   const [ready, setReady] = useState(false);
   const [draftStatus, setDraftStatus] = useState("");
   const [restored, setRestored] = useState(false);
@@ -171,6 +177,9 @@ export function EntryEditor({
     form.learning.trim() ||
     items.length,
   );
+  const hasUnsavedDraft = entry
+    ? draftFingerprint(form, items) !== initialFingerprint.current
+    : hasContent;
   const busy = items.some(
     (i) => i.status === "uploading" || i.status === "compressing",
   );
@@ -216,10 +225,13 @@ export function EntryEditor({
     readDraft(storageKey)
       .then((d) => {
         if (!active) return;
-        if (
-          d &&
-          (!entry || new Date(d.updatedAt) > new Date(entry.updatedAt))
-        ) {
+        const explicitlyOpenDeviceDraft = Boolean(
+          entry && new URLSearchParams(location.search).has("deviceDraft"),
+        );
+        const draftIsNewer = Boolean(
+          d && entry && new Date(d.updatedAt) > new Date(entry.updatedAt),
+        );
+        if (d && (!entry || explicitlyOpenDeviceDraft || draftIsNewer)) {
           const {
             updatedAt: _at,
             remoteId: _id,
@@ -230,8 +242,9 @@ export function EntryEditor({
           setForm(rest);
           if (
             entry &&
-            rest.revision !== undefined &&
-            rest.revision !== entry.revision
+            ((rest.revision !== undefined &&
+              rest.revision !== entry.revision) ||
+              (explicitlyOpenDeviceDraft && !draftIsNewer))
           )
             setConflict(entry);
           const restoredItems = (mediaInfo || []).map(mapMedia);
@@ -297,6 +310,48 @@ export function EntryEditor({
   }, [entry?.id]);
 
   useEffect(() => {
+    let active = true;
+    const loadTags = () => {
+      void api<{ tags: string[] }>("/family/entry-tags")
+        .then((result) => {
+          if (active) {
+            setTagOptions(result.tags);
+            setTagLoadError(false);
+          }
+        })
+        .catch(() => {
+          if (active) setTagLoadError(true);
+        });
+    };
+    loadTags();
+    window.addEventListener("focus", loadTags);
+    return () => {
+      active = false;
+      window.removeEventListener("focus", loadTags);
+    };
+  }, []);
+
+  function addCustomTag() {
+    const label = tagInput.trim();
+    if (!label) return;
+    if (
+      form.tags.some(
+        (tag) => tag.label.toLocaleLowerCase() === label.toLocaleLowerCase(),
+      )
+    ) {
+      setTagMessage("这条记录已经有这个标签。");
+      return;
+    }
+    if (form.tags.length >= 8) {
+      setTagMessage("一条记录最多贴 8 个标签。");
+      return;
+    }
+    patch("tags", [...form.tags, { label }]);
+    setTagInput("");
+    setTagMessage("");
+  }
+
+  useEffect(() => {
     if (!sheet || !sheetRef.current) return;
     const previous = document.activeElement as HTMLElement | null;
     const before = document.body.style.overflow;
@@ -333,14 +388,20 @@ export function EntryEditor({
   useEffect(() => {
     itemRef.current = items;
   }, [items]);
-  const latestDraft = useRef({ form, items, ready, hasContent, recording });
+  const latestDraft = useRef({
+    form,
+    items,
+    ready,
+    hasUnsavedDraft,
+    recording,
+  });
   useEffect(() => {
-    latestDraft.current = { form, items, ready, hasContent, recording };
-  }, [form, items, ready, hasContent, recording]);
+    latestDraft.current = { form, items, ready, hasUnsavedDraft, recording };
+  }, [form, items, ready, hasUnsavedDraft, recording]);
   useEffect(() => {
     const flush = () => {
       const current = latestDraft.current;
-      if (current.ready && current.hasContent && !savedRef.current) {
+      if (current.ready && current.hasUnsavedDraft && !savedRef.current) {
         void writeDraft(
           storageKey,
           snapshotDraft(current.form, current.items),
@@ -357,7 +418,7 @@ export function EntryEditor({
         waitUntil(
           Promise.reject(new Error("请先结束并保留录音，再更新应用。")),
         );
-      else if (current.ready && current.hasContent && !savedRef.current)
+      else if (current.ready && current.hasUnsavedDraft && !savedRef.current)
         waitUntil(
           writeDraft(storageKey, snapshotDraft(current.form, current.items)),
         );
@@ -371,8 +432,8 @@ export function EntryEditor({
   }, [storageKey]);
   useEffect(() => {
     if (!ready || savedRef.current) return;
-    if (!hasContent) {
-      void removeDraft(storageKey).catch(() => {});
+    if (!hasUnsavedDraft) {
+      if (!entry && !hasContent) void removeDraft(storageKey).catch(() => {});
       return;
     }
     const timer = setTimeout(() => {
@@ -384,7 +445,7 @@ export function EntryEditor({
         .catch(() => setDraftStatus("设备空间不足，请及时保存草稿"));
     }, 600);
     return () => clearTimeout(timer);
-  }, [form, items, ready, storageKey, hasContent]);
+  }, [form, items, ready, storageKey, hasContent, hasUnsavedDraft, entry]);
   useEffect(() => {
     function prevent(e: BeforeUnloadEvent) {
       if (busy || recording) {
@@ -572,11 +633,15 @@ export function EntryEditor({
       : (conflict.media || [])
           .filter((media): media is Media => typeof media !== "number")
           .map(mapMedia);
+    if (!keepMine)
+      initialFingerprint.current = draftFingerprint(resolved, resolvedItems);
     setForm(resolved);
     setItems(resolvedItems);
     setError("");
     try {
-      await writeDraft(storageKey, snapshotDraft(resolved, resolvedItems));
+      if (keepMine)
+        await writeDraft(storageKey, snapshotDraft(resolved, resolvedItems));
+      else await removeDraft(storageKey);
       setConflict(null);
       setDraftStatus(
         keepMine ? "保留了你的内容，先按私密记录继续编辑" : "已载入最新版本",
@@ -749,7 +814,9 @@ export function EntryEditor({
       {offlineDraft && (
         <section className="offline-recovery" aria-label="设备离线草稿">
           <strong>这台设备上还有一份离线草稿</strong>
-          <p>{offlineDraft.title || markdownExcerpt(offlineDraft.content, 160)}</p>
+          <p>
+            {offlineDraft.title || markdownExcerpt(offlineDraft.content, 160)}
+          </p>
           <p>带回后会与当前文字合并，先保持仅自己和家长可见。</p>
           <button
             className="secondary-button"
@@ -1159,30 +1226,44 @@ export function EntryEditor({
           />
           <div className="optional-tags">
             <span>给这段记忆贴个小标签</span>
+            <p className="muted">
+              常用标签由家长管理，也可以为这条记录添加自定义标签。
+            </p>
+            {tagLoadError && (
+              <p className="upload-error" role="status">
+                暂时无法读取常用标签，已选标签仍会保留。
+              </p>
+            )}
             <div>
               {[
-                "日常小事",
-                "新的尝试",
-                "我的作品",
-                "运动一下",
-                "读书时光",
-                "小小进步",
+                ...new Set([
+                  ...tagOptions,
+                  ...form.tags.map((tag) => tag.label),
+                ]),
               ].map((label) => (
                 <button
                   key={label}
+                  type="button"
+                  aria-pressed={form.tags.some((t) => t.label === label)}
                   className={
                     form.tags.some((t) => t.label === label)
                       ? "tag selected"
                       : "tag"
                   }
-                  onClick={() =>
+                  onClick={() => {
+                    const selected = form.tags.some((t) => t.label === label);
+                    if (!selected && form.tags.length >= 8) {
+                      setTagMessage("一条记录最多贴 8 个标签。");
+                      return;
+                    }
                     patch(
                       "tags",
-                      form.tags.some((t) => t.label === label)
+                      selected
                         ? form.tags.filter((t) => t.label !== label)
-                        : [...form.tags, { label }].slice(0, 8),
-                    )
-                  }
+                        : [...form.tags, { label }],
+                    );
+                    setTagMessage("");
+                  }}
                 >
                   {form.tags.some((t) => t.label === label) && (
                     <Check size={12} />
@@ -1191,6 +1272,46 @@ export function EntryEditor({
                 </button>
               ))}
             </div>
+            <div className="tag-input-row">
+              <input
+                aria-label="自定义标签"
+                placeholder="例如：征文比赛"
+                maxLength={20}
+                value={tagInput}
+                onChange={(event) => {
+                  setTagInput(event.target.value);
+                  setTagMessage("");
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+                    event.preventDefault();
+                    addCustomTag();
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={addCustomTag}
+                disabled={!tagInput.trim()}
+              >
+                添加标签
+              </button>
+            </div>
+            {tagMessage && (
+              <p className="upload-error" role="status">
+                {tagMessage}
+              </p>
+            )}
+            {user.role === "parent" && (
+              <Link
+                className="text-button"
+                href="/app/manage/tags"
+                target="_blank"
+              >
+                管理家庭常用标签
+              </Link>
+            )}
           </div>
           {error && (
             <p className="error-box" role="alert">

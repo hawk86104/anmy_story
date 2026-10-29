@@ -7,6 +7,13 @@ import {
 import { member, relationId } from "./access";
 import { json, spaceDTO } from "./public-entries";
 import { mediaReferences } from "./media-links";
+import { DEFAULT_ENTRY_TAGS, MAX_ENTRY_TAG_OPTIONS } from "@mylife/shared";
+
+function tagOptions(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((v): v is string => typeof v === "string")
+    : [...DEFAULT_ENTRY_TAGS];
+}
 
 async function familySpace(req: PayloadRequest) {
   const u = member(req)!;
@@ -43,6 +50,58 @@ async function familySpace(req: PayloadRequest) {
 }
 
 export const familyEndpoints: Endpoint[] = [
+  {
+    path: "/family/entry-tags",
+    method: "get",
+    handler: async (req) => {
+      if (!member(req)) return json({ error: "请先登录。" }, 401);
+      const space = await familySpace(req);
+      return json({ tags: tagOptions(space.entryTagOptions) });
+    },
+  },
+  {
+    path: "/family/entry-tags",
+    method: "patch",
+    handler: async (req) => {
+      if (member(req)?.role !== "parent")
+        return json({ error: "仅家长可以管理常用标签。" }, 403);
+      await addDataAndFileToRequest(req);
+      const tags = req.data?.tags;
+      if (
+        !Array.isArray(tags) ||
+        tags.length > MAX_ENTRY_TAG_OPTIONS ||
+        tags.some(
+          (label) =>
+            typeof label !== "string" ||
+            !label.trim() ||
+            label.trim().length > 20,
+        )
+      )
+        return json(
+          {
+            error: `标签需为 1 至 20 个字，最多 ${MAX_ENTRY_TAG_OPTIONS} 个。`,
+          },
+          400,
+        );
+      const normalized = tags.map((label: string) => label.trim());
+      if (
+        new Set(normalized.map((label: string) => label.toLocaleLowerCase()))
+          .size !== normalized.length
+      )
+        return json({ error: "常用标签不能重复。" }, 400);
+      const space = await familySpace(req);
+      const updated = await req.payload.update({
+        collection: "spaces",
+        id: space.id,
+        data: { entryTagOptions: normalized },
+        depth: 0,
+        overrideAccess: false,
+        user: req.user,
+        req,
+      });
+      return json({ tags: tagOptions(updated.entryTagOptions) });
+    },
+  },
   {
     path: "/family/space",
     method: "get",

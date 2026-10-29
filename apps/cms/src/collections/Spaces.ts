@@ -1,6 +1,10 @@
 import type { AccessResult, CollectionConfig } from "payload";
 import { APIError } from "payload";
-import { THEMES } from "@mylife/shared";
+import {
+  DEFAULT_ENTRY_TAGS,
+  MAX_ENTRY_TAG_OPTIONS,
+  THEMES,
+} from "@mylife/shared";
 import { authenticated, familyOnly, member, relationId } from "../lib/access";
 
 export const Spaces: CollectionConfig = {
@@ -133,6 +137,40 @@ export const Spaces: CollectionConfig = {
       type: "array",
       maxRows: 6,
       fields: [{ name: "label", type: "text", required: true, maxLength: 16 }],
+    },
+    {
+      name: "entryTagOptions",
+      label: "记录常用标签",
+      type: "json",
+      defaultValue: [...DEFAULT_ENTRY_TAGS],
+      admin: {
+        description:
+          "记录编辑器中的常用标签。也可以在手机家长后台的标签管理中维护；移除选项不会删除旧记录上的标签。",
+      },
+      access: {
+        create: ({ req }) => member(req)?.role === "parent",
+        update: ({ req }) => member(req)?.role === "parent",
+      },
+      validate: (value) => {
+        if (!Array.isArray(value) || value.length > MAX_ENTRY_TAG_OPTIONS)
+          return `请填写标签数组，最多 ${MAX_ENTRY_TAG_OPTIONS} 个。`;
+        if (
+          value.some(
+            (label) =>
+              typeof label !== "string" ||
+              !label.trim() ||
+              label !== label.trim() ||
+              label.length > 20,
+          )
+        )
+          return "每个标签需为 1 至 20 个字，前后不能有空格。";
+        if (
+          new Set(value.map((label) => label.toLocaleLowerCase())).size !==
+          value.length
+        )
+          return "常用标签不能重复。";
+        return true;
+      },
     },
     {
       name: "avatar",

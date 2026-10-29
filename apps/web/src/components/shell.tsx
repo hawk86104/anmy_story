@@ -13,6 +13,7 @@ import {
   UserRound,
   Image,
   LayoutGrid,
+  FilePenLine,
 } from "lucide-react";
 import { Brand } from "./brand";
 import { useSession } from "./session";
@@ -26,6 +27,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
     { href: "/app", icon: House, label: "我的空间" },
     { href: "/app/new", icon: Plus, label: "记一件事" },
     { href: "/app/entries", icon: BookOpen, label: "成长时间轴" },
+    { href: "/app/drafts", icon: FilePenLine, label: "我的草稿" },
   ];
   const moreNav = [
     { href: "/app/projects", icon: Palette, label: "我的成长项目" },
@@ -95,9 +97,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
                     ? "成长项目"
                     : path === "/app/new"
                       ? "记一件事"
-                      : path === "/app"
-                        ? "我的空间"
-                        : "成长时间轴"}
+                      : path === "/app/drafts"
+                        ? "我的草稿"
+                        : path === "/app"
+                          ? "我的空间"
+                          : "成长时间轴"}
             </strong>
           </div>
           <div className="mobile-brand">
@@ -155,6 +159,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
                   "/app/manage/themes",
                   "/app/manage/members",
                   "/app/manage/ai",
+                  "/app/manage/tags",
                 ].includes(path))
                 ? "active"
                 : ""

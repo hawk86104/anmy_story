@@ -21,6 +21,7 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
+  Tags,
   Trash2,
   Users,
   Video,
@@ -46,6 +47,7 @@ const links = [
   { href: "/app/manage/import", label: "导入", icon: FileUp },
   { href: "/app/manage/members", label: "成员", icon: Users },
   { href: "/app/manage/themes", label: "主题", icon: Palette },
+  { href: "/app/manage/tags", label: "标签", icon: Tags },
   { href: "/app/manage/settings", label: "设置", icon: Settings },
 ];
 export function ManageShell({ children }: { children: React.ReactNode }) {
@@ -207,6 +209,12 @@ export function ManageOverview() {
           icon={Palette}
           title="主页与主题"
           note="乌萨奇、小八与吉伊的三套色彩"
+        />
+        <ManageLink
+          href="/app/manage/tags"
+          icon={Tags}
+          title="管理记录标签"
+          note="添加或移除家庭常用标签"
         />
         <ManageLink
           href="/app/projects"
@@ -982,6 +990,12 @@ export function ManageSettings() {
           icon={Palette}
           title="主题与主页模块"
           note="选择喜欢的色彩与公开展示入口"
+        />
+        <ManageLink
+          href="/app/manage/tags"
+          icon={Tags}
+          title="记录常用标签"
+          note="为家庭记录添加和整理标签"
         />
         <ManageLink
           href="/app/manage/members"

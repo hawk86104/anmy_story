@@ -131,8 +131,28 @@ test(
               new Date().toISOString(),
             ],
           });
+          await payload.db.migrate({ migrations: migrations.slice(0, -1) });
+          await db.execute({
+            sql: "INSERT INTO spaces (family_id, owner_id) VALUES (?, ?)",
+            args: [family, child.id],
+          });
           await payload.db.migrate({ migrations });
           await payload.db.migrate({ migrations });
+          const migratedSpace = await db.execute({
+            sql: "SELECT entry_tag_options FROM spaces WHERE family_id = ?",
+            args: [family],
+          });
+          assert.deepEqual(
+            JSON.parse(String(migratedSpace.rows[0].entry_tag_options)),
+            [
+              "日常小事",
+              "新的尝试",
+              "我的作品",
+              "运动一下",
+              "读书时光",
+              "小小进步",
+            ],
+          );
           const old = await payload.findByID({
             collection: "entries",
             id: 9001,
@@ -239,6 +259,145 @@ test(
           assert.equal(profile.modules.works, false);
           for (const key of ["owner", "familyId", "id", "email"])
             assert.ok(!(key in profile));
+        },
+      );
+      await t.test(
+        "家庭标签支持家长维护、家庭隔离及保留旧记录标签",
+        async () => {
+          assert.equal(
+            (await call(familyEndpoints, "/family/entry-tags")).status,
+            401,
+          );
+          const initial = await (
+            await call(familyEndpoints, "/family/entry-tags", child)
+          ).json();
+          assert.ok(initial.tags.includes("小小进步"));
+          assert.equal(
+            (
+              await call(
+                familyEndpoints,
+                "/family/entry-tags",
+                child,
+                { tags: ["越权"] },
+                "patch",
+              )
+            ).status,
+            403,
+          );
+          assert.equal(
+            (
+              await call(
+                familyEndpoints,
+                "/family/entry-tags",
+                parent,
+                { tags: ["相同", " 相同 "] },
+                "patch",
+              )
+            ).status,
+            400,
+          );
+          const updated = await call(
+            familyEndpoints,
+            "/family/entry-tags",
+            parent,
+            { tags: [" 征文比赛 ", "获奖"] },
+            "patch",
+          );
+          assert.equal(updated.status, 200);
+          assert.deepEqual((await updated.json()).tags, ["征文比赛", "获奖"]);
+          assert.deepEqual(
+            (
+              await (
+                await call(familyEndpoints, "/family/entry-tags", child)
+              ).json()
+            ).tags,
+            ["征文比赛", "获奖"],
+          );
+          const otherTags = await (
+            await call(familyEndpoints, "/family/entry-tags", stranger)
+          ).json();
+          assert.ok(!otherTags.tags.includes("征文比赛"));
+          const freshChild = await createUser(
+            "fresh-child@usagi.invalid",
+            "child",
+            randomUUID(),
+          );
+          const freshTags = await (
+            await call(familyEndpoints, "/family/entry-tags", freshChild)
+          ).json();
+          assert.ok(freshTags.tags.includes("小小进步"));
+          const space = (
+            await payload.find({
+              collection: "spaces",
+              where: { familyId: { equals: family } },
+              user: child,
+              overrideAccess: false,
+            })
+          ).docs[0];
+          await payload.update({
+            collection: "spaces",
+            id: space.id,
+            data: { entryTagOptions: ["越权"] },
+            user: child,
+            overrideAccess: false,
+          });
+          assert.deepEqual(
+            (
+              await (
+                await call(familyEndpoints, "/family/entry-tags", child)
+              ).json()
+            ).tags,
+            ["征文比赛", "获奖"],
+          );
+          const tagged = await payload.create({
+            collection: "entries",
+            user: child,
+            overrideAccess: false,
+            data: {
+              type: "honor",
+              content: "参加征文比赛",
+              tags: [{ label: "征文比赛" }],
+              status: "draft",
+              datePrecision: "unknown",
+              visibility: "family",
+              familyId: family,
+              author: child.id,
+              clientId: randomUUID(),
+            },
+          });
+          await call(
+            familyEndpoints,
+            "/family/entry-tags",
+            parent,
+            { tags: [] },
+            "patch",
+          );
+          assert.deepEqual(
+            (
+              await (
+                await call(familyEndpoints, "/family/entry-tags", child)
+              ).json()
+            ).tags,
+            [],
+          );
+          const preserved = await payload.findByID({
+            collection: "entries",
+            id: tagged.id,
+            user: child,
+            overrideAccess: false,
+          });
+          assert.equal(preserved.tags?.[0].label, "征文比赛");
+          await call(
+            familyEndpoints,
+            "/family/entry-tags",
+            parent,
+            { tags: ["征文比赛", "获奖"] },
+            "patch",
+          );
+          const profile = await (
+            await call(publicEntryEndpoints, "/public/profile")
+          ).json();
+          assert.ok(!("entryTagOptions" in profile));
         },
       );
       await t.test(
@@ -660,6 +819,10 @@ test(
           );
           const req = await createLocalReq({ user: parent }, payload);
           const { dataset, files } = await archive.createFamilyArchive(req);
+          assert.deepEqual(dataset.profile?.entryTagOptions, [
+            "征文比赛",
+            "获奖",
+          ]);
           assert.equal(dataset.members.length, 3);
           assert.equal(dataset.settings?.apiKey, "test-secret-not-real");
           assert.ok(
@@ -705,6 +868,14 @@ test(
           });
           assert.equal(restored.restoredEntries, dataset.entries.length);
           assert.equal(restored.restoredMedia, dataset.media.length);
+          assert.deepEqual(
+            (
+              await (
+                await call(familyEndpoints, "/family/entry-tags", stranger)
+              ).json()
+            ).tags,
+            ["征文比赛", "获奖"],
+          );
           assert.ok(restored.restoredHistory > 100);
           const restoredEntries = await payload.find({
             collection: "entries",

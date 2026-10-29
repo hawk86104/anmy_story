@@ -27,6 +27,15 @@ export const ENTRY_TYPES = [
 export type EntryType = (typeof ENTRY_TYPES)[number]["value"];
 export type DatePrecision = "day" | "month" | "year" | "unknown";
 export type Visibility = "family" | "public";
+export const DEFAULT_ENTRY_TAGS = [
+  "日常小事",
+  "新的尝试",
+  "我的作品",
+  "运动一下",
+  "读书时光",
+  "小小进步",
+] as const;
+export const MAX_ENTRY_TAG_OPTIONS = 60;
 export const THEMES = [
   {
     value: "usagi",

@@ -472,6 +472,9 @@ export async function restoreFamilyArchive(
       displayName: p.displayName || "我的成长手记",
       bio: p.bio || "",
       interests: (p.interests || []).map((t: Row) => ({ label: t.label })),
+      ...(Array.isArray(p.entryTagOptions)
+        ? { entryTagOptions: p.entryTagOptions }
+        : {}),
       theme: ["usagi", "hachiware", "chiikawa"].includes(p.theme)
         ? p.theme
         : "usagi",
