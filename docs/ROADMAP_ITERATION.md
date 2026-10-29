@@ -118,7 +118,7 @@ npm run media:worker
 生产更新前先按 [宝塔完整备份步骤](DEPLOY_TENCENT.md#93-宝塔核对现有路径停机备份)停写并备份数据库、媒体、原件、`.env` 和旧提交。使用现有 PM2 的同一部署用户，确认站点真实路径与当前分支。
 
 ```bash
-cd /www/wwwroot/anmy_story
+cd /www/wwwroot/mylife
 node --version
 git status --short
 git fetch origin
@@ -138,7 +138,7 @@ pm2 status
 pm2 logs anmy-cms --lines 40 --nostream
 pm2 logs anmy-media --lines 40 --nostream
 curl -f http://127.0.0.1:3001/api/health
-curl -f https://story.icegl.cn/api/health
+curl -f https://cms.example.com/api/health
 pm2 save
 ```
 
@@ -150,7 +150,7 @@ pm2 save
 
 EO 生产分支核对为 `main`，根目录 `apps/web`，安装命令 `npm ci --prefix ../..`，构建命令 `npm run build`，输出 `.next`。`prebuild` 会生成带内容版本的 `sw.js` 并准备适配器所需目录。
 
-前台环境变量使用现有 `https://story.icegl.cn`，域名为 `https://anmy.icegl.cn`。`sw.js` 的不缓存响应头及根作用域权限已写入 Next.js 与 `edgeone.json`；控制台已有额外缓存规则时，确保工作器脚本每次能重新验证版本。
+前台环境变量使用现有 `https://cms.example.com`，域名为 `https://www.example.com`。`sw.js` 的不缓存响应头及根作用域权限已写入 Next.js 与 `edgeone.json`；控制台已有额外缓存规则时，确保工作器脚本每次能重新验证版本。
 
 在部署了对应提交的环境检查：
 

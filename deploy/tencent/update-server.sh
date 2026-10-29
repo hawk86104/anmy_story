@@ -11,12 +11,13 @@ if [[ "${ANMY_UPDATE_LOADED:-}" != "1" ]]; then
 fi
 unset ANMY_UPDATE_LOADED
 
-PROJECT_DIR="${PROJECT_DIR:-/www/wwwroot/anmy_story}"
-BACKUP_ROOT="${BACKUP_ROOT:-/www/backup/anmy_story}"
+# 支持从仓库内执行，也支持在仓库目录中运行下载到 /tmp 的引导脚本。
+PROJECT_DIR="${PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || (cd -- "$(dirname -- "$0")/../.." && pwd -P))}"
+BACKUP_ROOT="${BACKUP_ROOT:-/www/backup/$(basename -- "$PROJECT_DIR")}"
 MEDIA_DRAIN_TIMEOUT_SECONDS="${MEDIA_DRAIN_TIMEOUT_SECONDS:-900}"
 MEDIA_DRAIN_INTERVAL_SECONDS="${MEDIA_DRAIN_INTERVAL_SECONDS:-5}"
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:3001/api/health}"
-PUBLIC_HEALTH_URL="${PUBLIC_HEALTH_URL:-https://story.icegl.cn/api/health}"
+PUBLIC_HEALTH_URL="${PUBLIC_HEALTH_URL:-}"
 
 mkdir -p -- "$BACKUP_ROOT/logs"
 LOG_FILE="$BACKUP_ROOT/logs/update-$(date +%Y%m%d-%H%M%S)-$$.log"
@@ -221,11 +222,17 @@ runtime_json="$(
     const nextDistDir = path.relative(process.cwd(), path.resolve(process.cwd(), value("NEXT_DIST_DIR") || ".next")).split(path.sep).join("/") || ".";
     const commandPath = (v) => v.includes("/") ? path.resolve(process.cwd(), v) : v;
     const ffmpeg = commandPath(value("FFMPEG_PATH") || "ffmpeg"), ffprobe = commandPath(value("FFPROBE_PATH") || "ffprobe");
+    let publicHealth = "";
+    try {
+      const origin = new URL(value("CMS_ORIGIN") || "");
+      if (["http:", "https:"].includes(origin.protocol) && !origin.username && !origin.password && origin.pathname === "/" && !origin.search && !origin.hash)
+        publicHealth = new URL("/api/health", origin).href;
+    } catch {}
     for (const item of [db, media, originals, storage, ffmpeg, ffprobe, nextDistDir]) if (/[\r\n]/.test(item)) throw new Error("数据库或存储路径包含换行，无法安全处理。");
-    process.stdout.write(JSON.stringify({ db, media, originals, storage, ffmpeg, ffprobe, nextDistDir }));
+    process.stdout.write(JSON.stringify({ db, media, originals, storage, ffmpeg, ffprobe, nextDistDir, publicHealth }));
   '
 )"
-config_lines="$(printf '%s' "$runtime_json" | node -e 'const x=JSON.parse(require("node:fs").readFileSync(0,"utf8")); console.log([x.db,x.media,x.originals,x.storage,x.ffmpeg,x.ffprobe,x.nextDistDir].join("\n"));')"
+config_lines="$(printf '%s' "$runtime_json" | node -e 'const x=JSON.parse(require("node:fs").readFileSync(0,"utf8")); console.log([x.db,x.media,x.originals,x.storage,x.ffmpeg,x.ffprobe,x.nextDistDir,x.publicHealth].join("\n"));')"
 mapfile -t config <<< "$config_lines"
 DB_PATH="${config[0]}"
 MEDIA_ROOT="${config[1]}"
@@ -234,6 +241,7 @@ STORAGE_MODE="${config[3]}"
 FFMPEG_BIN="${config[4]}"
 FFPROBE_BIN="${config[5]}"
 next_generated_dist_dir="${config[6]}"
+PUBLIC_HEALTH_URL="${PUBLIC_HEALTH_URL:-${config[7]:-}}"
 [[ -f "$DB_PATH" ]] || fail "数据库文件不存在：$DB_PATH；不会创建新库。"
 command -v "$FFMPEG_BIN" >/dev/null 2>&1 || fail "找不到 FFmpeg：$FFMPEG_BIN；请检查媒体进程使用的 PATH 或 FFMPEG_PATH。"
 command -v "$FFPROBE_BIN" >/dev/null 2>&1 || fail "找不到 FFprobe：$FFPROBE_BIN；请检查媒体进程使用的 PATH 或 FFPROBE_PATH。"
@@ -396,7 +404,9 @@ log "本机后台健康检查通过，等待进程稳定。"
 sleep 3
 pm2_jlist | node -e 'const s=require("node:fs").readFileSync(0,"utf8");if(!s)process.exit(1);const a=JSON.parse(s);for(const n of ["anmy-cms","anmy-media"]){const p=a.filter(x=>x.name===n);if(p.length!==1||p[0].pm2_env?.status!=="online"){console.error(`${n} 未处于 online 状态`);process.exitCode=1}else console.log(`${n}: online`)}'
 pm2 status
-if curl --fail --silent --show-error --max-time 10 "$PUBLIC_HEALTH_URL" >/dev/null; then
+if [[ -z "$PUBLIC_HEALTH_URL" ]]; then
+  log "未配置有效的 CMS_ORIGIN 或 PUBLIC_HEALTH_URL，跳过公网健康检查。"
+elif curl --fail --silent --show-error --max-time 10 "$PUBLIC_HEALTH_URL" >/dev/null; then
   log "公网后台健康地址可访问：$PUBLIC_HEALTH_URL"
 else
   log "警告：本机健康检查通过，但公网后台健康地址未通过，请检查 Nginx / 域名。"

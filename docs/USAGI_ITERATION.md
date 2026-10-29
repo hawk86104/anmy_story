@@ -41,7 +41,7 @@
 npm run restore -- --help
 
 # 查看现有家庭 ID（数据库路径以服务器实际配置为准）。
-sqlite3 /www/wwwroot/anmy_story/db/mylife.db 'SELECT DISTINCT family_id FROM users;'
+sqlite3 /www/wwwroot/mylife/db/mylife.db 'SELECT DISTINCT family_id FROM users;'
 
 # 只检查，不写入；多个家庭时先核对目标账号，不能猜测 ID。
 NODE_ENV=production npm run restore -- \

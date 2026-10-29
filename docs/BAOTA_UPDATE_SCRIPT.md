@@ -1,6 +1,6 @@
 # 宝塔后台一键更新
 
-脚本 `deploy/tencent/update-server.sh` 针对现有部署：项目目录 `/www/wwwroot/anmy_story`、PM2 进程 `anmy-cms` 和 `anmy-media`、SQLite 数据库、宝塔后台端口 `3001`。它只更新宝塔后台，由你现有的流程处理前台发布。
+脚本 `deploy/tencent/update-server.sh` 针对宝塔后台：项目目录默认为当前 Git 仓库，PM2 进程为 `anmy-cms` 和 `anmy-media`，使用 SQLite 与后台端口 `3001`。文中的 `/www/wwwroot/mylife` 和 `/www/backup/mylife` 是示例，实际路径以自己的部署为准；脚本只更新宝塔后台。
 
 ## 首次使用
 
@@ -9,7 +9,7 @@
 在宝塔终端中，使用**原来管理这两个 PM2 进程的同一个 Linux 用户**执行：
 
 ```bash
-cd /www/wwwroot/anmy_story
+cd /www/wwwroot/mylife
 BOOTSTRAP="$(mktemp /tmp/anmy-story-update.XXXXXXXX)" && \
 git fetch origin main && \
 git show FETCH_HEAD:deploy/tencent/update-server.sh > "$BOOTSTRAP" && \
@@ -19,7 +19,7 @@ bash "$BOOTSTRAP"
 首次命令从远端 `main` 取出脚本；脚本随后会再次核对并更新仓库。之后脚本已经在服务器项目中，可直接执行：
 
 ```bash
-cd /www/wwwroot/anmy_story
+cd /www/wwwroot/mylife
 bash deploy/tencent/update-server.sh
 ```
 
@@ -32,11 +32,11 @@ bash deploy/tencent/update-server.sh
 3. 暂停 `anmy-cms`，让 `anmy-media` 继续处理现有视频队列。队列清空后停止媒体进程。默认最多等待 900 秒，等待期间会打印剩余数量。
 4. 按服务器实际 `.env` 和 PM2 环境识别数据库、素材及原件路径。备份 SQLite 并执行 `quick_check`，备份 `.env`、PM2 进程配置和存在的本地素材目录；数据库仍引用本地素材而对应目录不存在时停止。COS 云端对象不包含在这份服务器目录备份中，本地素材目录内的符号链接会保留为链接，链接目标需另行备份。
 5. 切换到本地 `main` 并以 `--ff-only` 合并目标提交；执行 `npm ci --include=dev`、Payload 生产迁移及后台构建。
-6. 按 `deploy/tencent/ecosystem.config.cjs` 重启两个 PM2 进程，检查本机健康接口和进程状态，再执行 `pm2 save`。公网健康地址失败会打印警告，供排查 Nginx / 域名。
+6. 按 `deploy/tencent/ecosystem.config.cjs` 重启两个 PM2 进程，检查本机健康接口和进程状态，再执行 `pm2 save`。公网健康地址默认从服务端的 `CMS_ORIGIN` 获取，也可显式设置 `PUBLIC_HEALTH_URL`；未配置有效地址时会提示跳过，检查失败会打印警告。
 
 更新期间后台接口会暂时不可用。脚本不会重新执行 `setup`、`seed`、开发数据库同步或数据库重置，也不会主动迁移、删除 COS 或本地素材。
 
-Next.js 构建可能把 `apps/cms/next-env.d.ts` 中的 `.next/dev/types/` 改为 `.next/types/`。如果运行前发现这一文件仅有上述 `routes.d.ts` 或 `root-params.d.ts` 路径变化、没有暂存或其他已跟踪文件修改，脚本会在完成前置检查后将它备份到 `/www/backup/anmy_story/logs/next-env-before-update-*.d.ts`，再恢复 Git 中的版本。构建之后也会只在确认变化仅限这些路径时恢复构建前内容；`NEXT_DIST_DIR` 指定的构建目录也会被识别。其他修改会保留并报错。可使用 `git diff -- apps/cms/next-env.d.ts` 查看实际差异。
+Next.js 构建可能把 `apps/cms/next-env.d.ts` 中的 `.next/dev/types/` 改为 `.next/types/`。如果运行前发现这一文件仅有上述 `routes.d.ts` 或 `root-params.d.ts` 路径变化、没有暂存或其他已跟踪文件修改，脚本会在完成前置检查后将它备份到 `/www/backup/mylife/logs/next-env-before-update-*.d.ts`，再恢复 Git 中的版本。构建之后也会只在确认变化仅限这些路径时恢复构建前内容；`NEXT_DIST_DIR` 指定的构建目录也会被识别。其他修改会保留并报错。可使用 `git diff -- apps/cms/next-env.d.ts` 查看实际差异。
 
 PM2 守护进程和当前 PM2 命令版本不一致时，`pm2 jlist` 可能在 JSON 旁输出版本提示。脚本会识别该提示并继续校验实际进程列表，不会自动执行 `pm2 update`；如果返回的进程列表无法解析或命令失败，仍会停止并提示检查。
 
@@ -50,11 +50,11 @@ NODE_BIN_DIR=/实际Node版本目录/bin bash deploy/tencent/update-server.sh
 
 ## 日志、备份与失败处理
 
-默认日志保存在 `/www/backup/anmy_story/logs/`，每次生成独立文件；启动和结束时都会打印完整路径。数据库、配置、本地素材和更新前后的提交号保存在 `/www/backup/anmy_story/时间戳-进程号/`。
+默认备份根目录为 `/www/backup/项目目录名`，例如 `/www/backup/mylife/`；可以使用 `BACKUP_ROOT` 覆盖。日志保存在其中的 `logs/`，数据库、配置、本地素材和更新前后的提交号保存在时间戳子目录。
 
 ```bash
-ls -lt /www/backup/anmy_story/logs | head
-tail -n 100 /www/backup/anmy_story/logs/日志文件名.log
+ls -lt /www/backup/mylife/logs | head
+tail -n 100 /www/backup/mylife/logs/日志文件名.log
 pm2 status
 pm2 logs anmy-cms --lines 50 --nostream
 pm2 logs anmy-media --lines 50 --nostream

@@ -84,7 +84,7 @@ Payload、`@payloadcms/next` 和 `@payloadcms/ui` 3.92.0 仍声明 Node `^22.23.
 
 HTTP 联调包含登录、提交、真实 multipart 图片上传、授权文件访问、公开申请、批准快照、撤回和退出登录；GitHub Actions 已配置在每次 push / PR 重跑类型、测试、迁移、构建与依赖审计。
 
-腾讯云独立部署适配额外验证：前台直连构建产物无 Next.js rewrites；PM2 配置能定位实际可执行文件；用本地生产服务及 `https://anmy.icegl.cn` 的 Origin 检查精确 CORS、登录预检、Secure/HttpOnly/SameSite=Lax Cookie、带凭据图片上传与读取、匿名文件访问拒绝。这里的接口验证没有连接真实宝塔或 EO 项目，真实域名、HTTPS、平台适配和手机 Cookie 行为仍需按部署清单验收。
+腾讯云独立部署适配额外验证：前台直连构建产物无 Next.js rewrites；PM2 配置能定位实际可执行文件；用本地生产服务及 `https://www.example.com` 的 Origin 检查精确 CORS、登录预检、Secure/HttpOnly/SameSite=Lax Cookie、带凭据图片上传与读取、匿名文件访问拒绝。这里的接口验证没有连接真实宝塔或 EO 项目，真实域名、HTTPS、平台适配和手机 Cookie 行为仍需按部署清单验收。
 
 EO 安装命令修正后，在不含 `node_modules` 或本地 `.env` 的全新代码目录，使用 Node 24.22.1，从 `apps/web` 执行 `npm ci --prefix ../..`，再以正式后台地址执行 `npm run build`，均通过。CI 同样从该目录安装依赖。
 

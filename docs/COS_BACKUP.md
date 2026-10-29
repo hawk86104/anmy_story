@@ -6,7 +6,7 @@
 
 服务端使用腾讯云官方 `cos-nodejs-sdk-v5`，通过 HTTPS、Host 签名、Content-MD5、上传后的 HEAD 校验写入对象。规则参见[腾讯云 Node.js SDK 快速入门](https://cloud.tencent.com/document/product/436/8629)。密钥只写入 `apps/cms/.env` 或部署环境，不进入 Git、浏览器代码、备份 ZIP。
 
-复制 `deploy/tencent/cms.env.example` 中的 `MEDIA_STORAGE=cos`、COS 和备份配置到服务器真实 `.env`，填写两项凭据。桶为 `anmy-story-1253949117`，区域 `ap-nanjing`，CDN 为 `https://anmy-story.icegl.cn`。COS API 以 Bucket/Region 定位存储桶；账号信息不用于拼接桶名。
+复制 `deploy/tencent/cms.env.example` 中的 `MEDIA_STORAGE=cos`、COS 和备份配置到服务器真实 `.env`，填写自己的存储桶、区域及两项服务端凭据；使用 CDN 时填写对应地址。COS API 以 Bucket/Region 定位存储桶；账号信息不用于拼接桶名。
 
 新附件的对象键为 `media/YYYY-MM-DD/随机文件名`，原件为 `media/YYYY-MM-DD/originals/随机文件名`。日期使用上海时区的记录创建时间，补记的发生日期不会改变目录；编辑旧记录上传附件时沿用该记录创建日期。素材库、头像、项目封面单独上传时使用上传日期。还原保留归档日期。
 

@@ -1,6 +1,7 @@
 {
   "name": "mylife",
   "version": "0.1.0",
+  "license": "MIT",
   "private": true,
   "workspaces": [
     "apps/*",
@@ -14,7 +15,8 @@
     "setup": "node scripts/setup.mjs",
     "seed": "npm run seed --workspace @mylife/cms",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test --workspace @mylife/cms && npm run test --workspace @mylife/web && npm run test:deploy",
+    "test": "npm run test:setup && npm run test --workspace @mylife/cms && npm run test --workspace @mylife/web && npm run test:deploy",
+    "test:setup": "node --test scripts/tests/setup.test.mjs",
     "test:deploy": "node --test scripts/tests/server-update.test.mjs",
     "build": "npm run build --workspace @mylife/cms && npm run build --workspace @mylife/web",
     "media:worker": "npm run media:worker --workspace @mylife/cms --",

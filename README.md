@@ -92,7 +92,7 @@ docs/               实施顺序、架构、运行与验证说明
 
 现已补齐记录的数据库原子版本保护、家长端 CSV / JSON 历史文字批量导入，以及可安装的离线记事外壳。使用入口与本地 / 宝塔更新步骤见 [Roadmap 迭代说明](docs/ROADMAP_ITERATION.md)。
 
-附件统一存入 COS 的 `media/记录创建日期/`，经 `anmy-story.icegl.cn` 的临时签名地址访问。家长设置页与 Payload 后台首页提供完整 ZIP 备份、预检与整体还原、清空所有历史记录和素材。部署配置、旧素材迁移与备份边界见 [COS 与完整备份](docs/COS_BACKUP.md)。
+附件支持本地存储或存入 COS 的 `media/记录创建日期/`，云端附件通过临时签名地址访问。家长设置页与 Payload 后台首页提供完整 ZIP 备份、预检与整体还原、清空所有历史记录和素材。部署配置、旧素材迁移与备份边界见 [COS 与完整备份](docs/COS_BACKUP.md)。
 
 本次更新的日常调试、临时测试库、上传/备份/清空/还原验收、宝塔迁移和 EO 发布命令见 [本地测试与宝塔升级步骤](docs/UPDATE_20261028_COS_BACKUP.md)。
 
@@ -110,6 +110,8 @@ npm run setup
 ```
 
 在 `apps/cms/.env` 中填写 `PARENT_EMAIL`、`PARENT_PASSWORD`、`CHILD_EMAIL`、`CHILD_PASSWORD`，使用不同的邮箱以及至少 12 位且不同的密码。`setup` 会生成随机服务端密钥，保留已有配置，不覆盖账号。不要提交 `.env`。
+
+新配置默认将附件保存在本地；如需 COS，在后台 `.env` 中设置 `MEDIA_STORAGE=cos` 并填写自己的存储桶、区域、凭据和可选 CDN。不要把真实配置提交到仓库。
 
 ```bash
 npm run dev:prepare
@@ -137,10 +139,18 @@ npm run build
 
 测试使用独立的临时数据库和素材目录，不改动真实家庭数据，包含真实图片压缩与 FFmpeg 转码。[验证说明](docs/VALIDATION.md)记录验证范围与限制。
 
+## 许可证与素材
+
+本项目自行开发的源代码使用 [MIT 许可证](LICENSE)。
+
+`apps/web/public/themes/usagi/` 和 `design/usagi-theme/` 中的素材及设计稿包含参考乌萨奇、吉伊和小八等角色的形象，可能涉及第三方权利，不属于上述 MIT 授权范围。公开、使用或再分发前，请确认相关权利，或替换为有授权的素材。
+
 ## 继续完善
 
 开发顺序见 [ROADMAP](docs/ROADMAP.md)，权限和数据边界见 [架构说明](docs/ARCHITECTURE.md)，正式环境配置见 [运行与部署](docs/OPERATIONS.md)。
 
-本次指定的 `anmy.icegl.cn`（EO Pages）+ `story.icegl.cn`（Ubuntu 22.04 宝塔）部署步骤、SQLite 初始化、PM2 与 Nginx 模板见 [腾讯云部署清单](docs/DEPLOY_TENCENT.md)。
+准备公开代码前，请阅读[开源前检查](docs/OPEN_SOURCE.md)，确认历史、配置、许可证与素材使用权。
+
+EdgeOne Pages + Ubuntu 宝塔的部署步骤、SQLite 初始化、PM2 与 Nginx 模板见 [腾讯云部署清单](docs/DEPLOY_TENCENT.md)；文档中的域名和路径均为示例。
 
 已有宝塔后台可使用[服务器更新脚本](docs/BAOTA_UPDATE_SCRIPT.md)，自动备份、拉取 `main`、安装依赖、迁移、构建并重启 PM2，日志逐步保留。

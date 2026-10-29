@@ -1,6 +1,6 @@
 # Ubuntu 22.04 宝塔 + EdgeOne Pages 部署
 
-当前部署采用 EdgeOne Pages 前台 + 宝塔后台。本文按当前 GitHub 主分支 `main` 说明；EO 控制台的生产分支也应与实际发布分支一致。
+本文以 EdgeOne Pages 前台 + 宝塔后台为例，按 GitHub 主分支 `main` 说明；EO 控制台的生产分支也应与实际发布分支一致。文中的域名、COS 标识、目录和仓库地址均为示例，执行前请替换为自己的实际配置；已有站点继续使用自己的 `.env`。
 
 已经部署成功后的版本更新，直接看[第 9 节](#9-已部署站点的版本更新与回滚)。不要重新初始化数据库或账号。
 
@@ -8,27 +8,27 @@
 
 | 部分               | 地址 / 位置                                     |
 | ------------------ | ----------------------------------------------- |
-| 前台与手机记录界面 | `https://anmy.icegl.cn`，EdgeOne Pages          |
-| 后台 REST API      | `https://story.icegl.cn/api`，Ubuntu 宝塔服务器 |
-| 家长后台           | `https://story.icegl.cn/admin`                  |
-| 数据库             | SQLite，`/www/wwwroot/anmy_story/db/mylife.db`  |
-| 图片、视频、录音   | `/www/wwwroot/anmy_story/media`                 |
+| 前台与手机记录界面 | `https://www.example.com`，EdgeOne Pages          |
+| 后台 REST API      | `https://cms.example.com/api`，Ubuntu 宝塔服务器 |
+| 家长后台           | `https://cms.example.com/admin`                  |
+| 数据库             | SQLite，`/www/wwwroot/mylife/db/mylife.db`  |
+| 图片、视频、录音   | `/www/wwwroot/mylife/media`                 |
 
 ## 1. 这套部署的数据和请求走向
 
 GitHub `main` 更新 → EdgeOne Pages 自动构建前台。宝塔后台与数据库需要单独更新。
 
-浏览器打开 `anmy.icegl.cn`；登录、记录、文件上传与媒体播放直接访问 `story.icegl.cn`。宝塔 Nginx 把后台请求转发给本机 `127.0.0.1:3001`，Payload 读写 SQLite 与素材目录。另一个后台进程执行 FFmpeg 视频处理。
+浏览器打开 `www.example.com`；登录、记录、文件上传与媒体播放直接访问 `cms.example.com`。宝塔 Nginx 把后台请求转发给本机 `127.0.0.1:3001`，Payload 读写 SQLite 与素材目录。另一个后台进程执行 FFmpeg 视频处理。
 
 选择直连有两个实际原因：EO 官方目前不支持 Next.js 内置 `rewrites`；函数请求体有大小限制，不适合代理当前 100MB 上限的媒体上传。前台页面与静态资源依然在 EO 部署与分发，视频不经过 EO 函数。
 
-两个 HTTPS 子域都属于 `icegl.cn`。登录 Cookie 保持 `HttpOnly`、`Secure`、`SameSite=Lax`，只绑定后台主机；前台请求使用 `credentials: include`，后台 CORS 精确允许 `https://anmy.icegl.cn`。不需要把令牌放到 LocalStorage，也不需要开放任意 Origin。
+两个 HTTPS 子域都属于 `example.com`。登录 Cookie 保持 `HttpOnly`、`Secure`、`SameSite=Lax`，只绑定后台主机；前台请求使用 `credentials: include`，后台 CORS 精确允许 `https://www.example.com`。不需要把令牌放到 LocalStorage，也不需要开放任意 Origin。
 
-EO 默认 `*.edgeone.app` 预览地址与 `story.icegl.cn` 跨站，不能直接用于当前 Cookie 策略下的完整登录验收。先绑定正式前台域名；如需预览登录，另配同主域的预览子域与后台白名单。
+EO 默认 `*.edgeone.app` 预览地址与 `cms.example.com` 跨站，不能直接用于当前 Cookie 策略下的完整登录验收。先绑定正式前台域名；如需预览登录，另配同主域的预览子域与后台白名单。
 
 ## 2. 先准备服务器和 DNS
 
-1. `story.icegl.cn` 的 A 记录指向腾讯云服务器公网 IP。
+1. `cms.example.com` 的 A 记录指向腾讯云服务器公网 IP。
 2. 宝塔准备 Nginx；系统安装 Git、FFmpeg，以及用于备份/检查的 SQLite 命令行工具：
 
 ```bash
@@ -50,45 +50,45 @@ npm install -g pm2
 
 ## 3. 拉取代码并配置持久目录
 
-先为这台服务器配置 GitHub 仓库的只读 Deploy Key，再拉取私有仓库。不要把私钥或访问令牌写入 Git URL。
+按仓库的实际访问方式拉取代码；私有仓库可使用只读 Deploy Key。不要把私钥或访问令牌写入 Git URL。
 
 ```bash
-git clone git@github.com:hawk86104/anmy_story.git /www/wwwroot/anmy_story
-cd /www/wwwroot/anmy_story
+git clone <仓库地址> /www/wwwroot/mylife
+cd /www/wwwroot/mylife
 npm ci
 
-mkdir -p /www/wwwroot/anmy_story/db
-mkdir -p /www/wwwroot/anmy_story/media
-mkdir -p /www/wwwroot/anmy_story/backups
+mkdir -p /www/wwwroot/mylife/db
+mkdir -p /www/wwwroot/mylife/media
+mkdir -p /www/wwwroot/mylife/backups
 
 # 首次部署创建配置；-n 不覆盖已经存在的 .env。
 cp -n deploy/tencent/cms.env.example apps/cms/.env
 chmod 600 apps/cms/.env
 ```
 
-数据库和媒体目录的读写权限要授予运行 CMS / 视频进程的同一部署用户。宝塔面板若选择 `www` 用户运行，目录所有者也应与之对应。代码更新或重新构建不应删除 `/www/wwwroot/anmy_story`。
+数据库和媒体目录的读写权限要授予运行 CMS / 视频进程的同一部署用户。宝塔面板若选择 `www` 用户运行，目录所有者也应与之对应。代码更新或重新构建不应删除 `/www/wwwroot/mylife`。
 
 打开 `apps/cms/.env` 填写：
 
 ```dotenv
 NODE_ENV=production
 PAYLOAD_SECRET=填入一次生成的随机密钥
-DATABASE_URL=file:/www/wwwroot/anmy_story/db/mylife.db
-MEDIA_ROOT=/www/wwwroot/anmy_story/media
+DATABASE_URL=file:/www/wwwroot/mylife/db/mylife.db
+MEDIA_ROOT=/www/wwwroot/mylife/media
 MEDIA_STORAGE=cos
-COS_APP_ID=100000838747
+COS_APP_ID=1250000000
 COS_SECRET_ID=填写服务端凭据
 COS_SECRET_KEY=填写服务端凭据
-COS_BUCKET=anmy-story-1253949117
+COS_BUCKET=example-1250000000
 COS_REGION=ap-nanjing
-COS_DOMAIN=anmy-story-1253949117.cos.ap-nanjing.myqcloud.com
-COS_CDN_ORIGIN=https://anmy-story.icegl.cn
+COS_DOMAIN=example-1250000000.cos.ap-nanjing.myqcloud.com
+COS_CDN_ORIGIN=https://media.example.com
 MAX_BACKUP_MB=1024
 MAX_BACKUP_EXPANDED_MB=4096
-ORIGINALS_ROOT=/www/wwwroot/anmy_story/media-originals
-MEDIA_WORKER_LOCK=/www/wwwroot/anmy_story/media-worker.lock
-WEB_ORIGIN=https://anmy.icegl.cn
-CMS_ORIGIN=https://story.icegl.cn
+ORIGINALS_ROOT=/www/wwwroot/mylife/media-originals
+MEDIA_WORKER_LOCK=/www/wwwroot/mylife/media-worker.lock
+WEB_ORIGIN=https://www.example.com
+CMS_ORIGIN=https://cms.example.com
 MAX_UPLOAD_MB=100
 VIDEO_TIMEOUT_SECONDS=600
 ```
@@ -134,19 +134,19 @@ curl -f http://127.0.0.1:3001/api/health
 
 期望返回 `{"ok":true,"app":"mylife-cms"}`。
 
-## 6. 宝塔配置 story.icegl.cn 与 HTTPS
+## 6. 宝塔配置 cms.example.com 与 HTTPS
 
-在宝塔创建 `story.icegl.cn` 站点，申请并启用 HTTPS。应用统一反向代理到 `http://127.0.0.1:3001`，保留宝塔证书验证与续期配置。参考 [Nginx 配置片段](../deploy/tencent/nginx-cms.conf)：上传上限设为 110MB，请求正文与转发超时覆盖上传过程。
+在宝塔创建 `cms.example.com` 站点，申请并启用 HTTPS。应用统一反向代理到 `http://127.0.0.1:3001`，保留宝塔证书验证与续期配置。参考 [Nginx 配置片段](../deploy/tencent/nginx-cms.conf)：上传上限设为 110MB，请求正文与转发超时覆盖上传过程。
 
 这个后台站点不启用静态扩展名缓存规则，不把素材目录直接映射成公开静态路径。`/api`、媒体文件和 `/admin` 都由 Payload / Next.js 提供。数据库与素材不配置为可直读的静态目录。Nginx 配置完成后，运行宝塔的配置检查并重载 Nginx。
 
 对外验证：
 
 ```bash
-curl -f https://story.icegl.cn/api/health
+curl -f https://cms.example.com/api/health
 ```
 
-浏览器打开 `https://story.icegl.cn/admin`，使用初始化的家长账号登录。后台 API 与媒体不配置 CDN 强制缓存；身份验证、可见性撤回依赖每次服务端检查。
+浏览器打开 `https://cms.example.com/admin`，使用初始化的家长账号登录。后台 API 与媒体不配置 CDN 强制缓存；身份验证、可见性撤回依赖每次服务端检查。
 
 ## 7. 再配置 EdgeOne Pages 前台
 
@@ -172,14 +172,14 @@ curl -f https://story.icegl.cn/api/health
 在 EO 项目设置中加入 [前台环境变量](../deploy/tencent/web.env.example)：
 
 ```dotenv
-NEXT_PUBLIC_API_ORIGIN=https://story.icegl.cn
-NEXT_PUBLIC_CMS_ADMIN_URL=https://story.icegl.cn/admin
-CMS_INTERNAL_URL=https://story.icegl.cn
+NEXT_PUBLIC_API_ORIGIN=https://cms.example.com
+NEXT_PUBLIC_CMS_ADMIN_URL=https://cms.example.com/admin
+CMS_INTERNAL_URL=https://cms.example.com
 ```
 
 `NEXT_PUBLIC_*` 会在构建时写入浏览器代码，修改后要重新构建部署。EO 不需要 SQLite 文件、数据库权限或 `PAYLOAD_SECRET`。`.nvmrc` 是构建用 Node 版本；函数运行时的适配仍由 EO 管理。
 
-添加自定义域名 `anmy.icegl.cn`，将它的 CNAME 配成 EO 控制台给出的目标，再启用 HTTPS。生产环境验收使用 `https://anmy.icegl.cn`。
+添加自定义域名 `www.example.com`，将它的 CNAME 配成 EO 控制台给出的目标，再启用 HTTPS。生产环境验收使用 `https://www.example.com`。
 
 首次 EO 部署仍需观察真实平台的构建与运行日志：仓库检查不能代替 EO 平台的实际部署验收。
 
@@ -189,14 +189,14 @@ CMS_INTERNAL_URL=https://story.icegl.cn
 
 ```bash
 node scripts/verify-deployment.mjs \
-  --api-origin https://story.icegl.cn \
-  --web-origin https://anmy.icegl.cn
+  --api-origin https://cms.example.com \
+  --web-origin https://www.example.com
 ```
 
 然后用实际手机完成：
 
 - 从前台登录孩子账号，写文字、传图片、保存后刷新，记录仍在。
-- 上传一段 20MB 以上且不超过 100MB 的视频。浏览器网络请求目的地应为 `story.icegl.cn/api/media`，随后看到排队、处理与播放结果。
+- 上传一段 20MB 以上且不超过 100MB 的视频。浏览器网络请求目的地应为 `cms.example.com/api/media`，随后看到排队、处理与播放结果。
 - 录音、播放，刷新后确认原音频仍可访问。
 - 退出登录；未登录浏览器不能读取家庭记录和私人媒体地址。
 - 孩子选择所有人可见并保存，无需家长审批；退出登录后可从公开首页打开完整详情及附件。撤回后刷新公开详情与媒体地址，访问权限同步取消。
@@ -241,7 +241,7 @@ node scripts/verify-deployment.mjs \
 ```bash
 # 后续同一会话中，任一命令报错即停止，先处理错误再继续。
 set -e
-cd /www/wwwroot/anmy_story
+cd /www/wwwroot/mylife
 node --version
 pm2 status
 git status --short
@@ -254,14 +254,14 @@ git log -1 --oneline origin/main
 grep -E '^(DATABASE_URL|MEDIA_ROOT|ORIGINALS_ROOT|MEDIA_WORKER_LOCK)=' apps/cms/.env
 ```
 
-Node 应为 `v24.18.0`。如果 Git 显示服务器上有已跟踪文件的本地修改，先保留并合并这些修改，不使用强制重置。后续示例按你当前的 `/www/wwwroot/anmy_story` 路径填写；如果现有 `.env` 指向别处，以真实路径为准，调整下面的变量，**不更改现有 DATABASE_URL 来迁就示例**。
+Node 应为 `v24.18.0`。如果 Git 显示服务器上有已跟踪文件的本地修改，先保留并合并这些修改，不使用强制重置。后续示例按你当前的 `/www/wwwroot/mylife` 路径填写；如果现有 `.env` 指向别处，以真实路径为准，调整下面的变量，**不更改现有 DATABASE_URL 来迁就示例**。
 
 ```bash
 # 以下变量在同一个终端会话中继续使用。
-DB=/www/wwwroot/anmy_story/db/mylife.db
-MEDIA=/www/wwwroot/anmy_story/media
-ORIGINALS=/www/wwwroot/anmy_story/media-originals
-BACKUP=/www/backup/anmy_story/$(date +%Y%m%d-%H%M%S)
+DB=/www/wwwroot/mylife/db/mylife.db
+MEDIA=/www/wwwroot/mylife/media
+ORIGINALS=/www/wwwroot/mylife/media-originals
+BACKUP=/www/backup/mylife/$(date +%Y%m%d-%H%M%S)
 
 # 停止写入与视频处理后，备份数据库、文件、配置和旧提交。
 pm2 stop anmy-cms anmy-media
@@ -305,7 +305,7 @@ npm run build --workspace @mylife/cms
 早前乌萨奇版本本身无需新增必填配置；2026-10-28 的 COS 更新需要按上述新步骤补齐 COS 环境变量。若希望明确指定旧上传原件目录，可追加这一项，路径所有者与 PM2 用户一致：
 
 ```dotenv
-ORIGINALS_ROOT=/www/wwwroot/anmy_story/media-originals
+ORIGINALS_ROOT=/www/wwwroot/mylife/media-originals
 ```
 
 AI 与原件保留均默认关闭。通过手机家长端 `/app/manage/ai` 配置实际服务地址、模型、密钥并授权后才可主动调用；不把 AI 密钥写到 EO。开启“保留原件”仅影响之后的新上传，不能找回旧版已经清理的原件。
@@ -320,9 +320,9 @@ pm2 status
 pm2 logs anmy-cms --lines 40 --nostream
 pm2 logs anmy-media --lines 40 --nostream
 curl -f http://127.0.0.1:3001/api/health
-curl -f https://story.icegl.cn/api/health
-curl -f https://story.icegl.cn/api/public/profile
-curl -f 'https://story.icegl.cn/api/public/projects?limit=1'
+curl -f https://cms.example.com/api/health
+curl -f https://cms.example.com/api/public/profile
+curl -f 'https://cms.example.com/api/public/projects?limit=1'
 pm2 save
 ```
 
@@ -335,19 +335,19 @@ pm2 save
 原有安装 / 构建设置保持第 7 节的值。前台环境变量仍为：
 
 ```dotenv
-NEXT_PUBLIC_API_ORIGIN=https://story.icegl.cn
-NEXT_PUBLIC_CMS_ADMIN_URL=https://story.icegl.cn/admin
-CMS_INTERNAL_URL=https://story.icegl.cn
+NEXT_PUBLIC_API_ORIGIN=https://cms.example.com
+NEXT_PUBLIC_CMS_ADMIN_URL=https://cms.example.com/admin
+CMS_INTERNAL_URL=https://cms.example.com
 ```
 
-在 EO 对这次 `main` 的同一提交重新部署，确认成功、绑定域名仍为 `anmy.icegl.cn`，再恢复生产自动部署。更改 `NEXT_PUBLIC_*` 后需要重新构建；不需要向 EO 上传数据库、媒体或后台密钥。
+在 EO 对这次 `main` 的同一提交重新部署，确认成功、绑定域名仍为 `www.example.com`，再恢复生产自动部署。更改 `NEXT_PUBLIC_*` 后需要重新构建；不需要向 EO 上传数据库、媒体或后台密钥。
 
 在仓库根目录执行只读检查：
 
 ```bash
 node scripts/verify-deployment.mjs \
-  --api-origin https://story.icegl.cn \
-  --web-origin https://anmy.icegl.cn
+  --api-origin https://cms.example.com \
+  --web-origin https://www.example.com
 ```
 
 然后在真实手机检查：
@@ -383,4 +383,4 @@ node scripts/verify-deployment.mjs \
 - [EO 生产分支与自动触发部署](https://edgeone.cloud.tencent.com/pages/document/162936814287618048)
 - [Payload 生产迁移](https://payloadcms.com/docs/database/migrations)
 
-你已确认首版在宝塔部署成功。本次实现与迁移在本地隔离环境验证，未连接你的宝塔或 EO 控制台，也未替你更新生产数据。更新后的真实线上状态仍需按本文验收。
+迁移与更新应先在隔离环境验证；实际宝塔和 EO 的发布状态仍需按本文逐项验收。

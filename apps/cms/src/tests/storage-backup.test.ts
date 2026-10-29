@@ -34,7 +34,7 @@ test(
       COS_SECRET_KEY: "test-key",
       COS_BUCKET: "test-1250000000",
       COS_REGION: "ap-nanjing",
-      COS_CDN_ORIGIN: "https://anmy-story.icegl.cn",
+      COS_CDN_ORIGIN: "https://media.example.com",
     });
     process.env.COS_DOMAIN = "test-1250000000.cos.ap-nanjing.myqcloud.com";
     const { getPayload } = await import("payload");
@@ -233,7 +233,7 @@ test(
           assert.notEqual(media.filename, second.filename);
           assert.equal(media.storage, "cos");
           const url = new URL(media.url!);
-          assert.equal(url.host, "anmy-story.icegl.cn");
+          assert.equal(url.host, "media.example.com");
           assert.equal(url.searchParams.get("q-header-list"), "host");
           assert.ok(objects.has(storage.mediaKey(media)));
           const original = await payload.findByID({

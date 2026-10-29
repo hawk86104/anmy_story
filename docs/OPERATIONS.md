@@ -10,7 +10,7 @@
 | DATABASE_URL               | 默认 `file:./data/mylife.db`，相对后台工作目录          |
 | MEDIA_ROOT                 | 默认后台 `./media`，读取旧素材；COS 模式新上传不落盘    |
 | ORIGINALS_ROOT             | 迁移前的旧原件目录，新原件也存入 COS 日期目录           |
-| MEDIA_STORAGE              | 日常及正式部署使用 `cos`；隔离离线测试使用 `local`       |
+| MEDIA_STORAGE              | 新建本地配置默认 `local`；使用 COS 时设置为 `cos`       |
 | COS_SECRET_ID / COS_SECRET_KEY | 仅服务端环境配置的 COS 凭据                          |
 | COS_BUCKET / COS_REGION / COS_CDN_ORIGIN | 存储桶、区域与 CDN 源地址                  |
 | MAX_BACKUP_MB / MAX_BACKUP_EXPANDED_MB | ZIP 上传/解压上限，默认 1024 / 4096 MB     |
@@ -40,7 +40,9 @@
 
 ## 百度统计
 
-前台已在全站布局中接入百度统计代码，包括登录后的家庭空间页面。Next.js 的站内跳转不会重新加载整页；如需统计这些页面浏览，请在百度统计的“管理 → 单页应用设置”中启用单页应用数据统计，避免再添加重复的手动页面浏览跟踪。详情见[百度统计单页应用设置](https://tongji.baidu.com/web/help/article?id=324&type=0)。
+前台可选接入百度统计：在前台构建环境设置 `NEXT_PUBLIC_BAIDU_ANALYTICS_ID` 为自己的 32 位十六进制站点 ID，留空或格式无效时不会加载统计脚本。该值会出现在浏览器代码中，不是服务端密钥；修改后需要重新构建前台。已部署站点升级前需在 EdgeOne 的环境变量中填写原站点 ID，才能继续统计。启用后会覆盖登录后的家庭空间页面，请按家庭隐私需求决定是否启用。
+
+Next.js 的站内跳转不会重新加载整页；如需统计这些页面浏览，请在百度统计的“管理 → 单页应用设置”中启用单页应用数据统计，避免再添加重复的手动页面浏览跟踪。详情见[百度统计单页应用设置](https://tongji.baidu.com/web/help/article?id=324&type=0)。
 
 ## 备份与边界
 

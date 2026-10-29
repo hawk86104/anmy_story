@@ -23,19 +23,23 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const analyticsId = process.env.NEXT_PUBLIC_BAIDU_ANALYTICS_ID?.trim() ?? "";
+  const hasAnalyticsId = /^[a-f0-9]{32}$/i.test(analyticsId);
   return (
     <html lang="zh-CN">
       <body>
         <PublicNavigationProvider>{children}</PublicNavigationProvider>
-        <Script id="baidu-analytics" strategy="afterInteractive">{`
+        {hasAnalyticsId && (
+          <Script id="baidu-analytics" strategy="afterInteractive">{`
           var _hmt = _hmt || [];
           (function() {
             var hm = document.createElement("script");
-            hm.src = "https://hm.baidu.com/hm.js?2d2ba1fac39b489ab44585722d6301b2";
+            hm.src = "https://hm.baidu.com/hm.js?${analyticsId}";
             var s = document.getElementsByTagName("script")[0];
             s.parentNode.insertBefore(hm, s);
           })();
-        `}</Script>
+          `}</Script>
+        )}
       </body>
     </html>
   );

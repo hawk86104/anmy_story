@@ -12,11 +12,15 @@ for (const app of ["cms", "web"]) {
     continue;
   } catch {}
   let text = await readFile(new URL(`apps/${app}/.env.example`, root), "utf8");
-  if (app === "cms")
+  if (app === "cms") {
+    const secretPlaceholder = /^PAYLOAD_SECRET=[ \t]*(\r?\n|$)/m;
+    if (!secretPlaceholder.test(text))
+      throw new Error("后台环境模板缺少空的 PAYLOAD_SECRET，无法安全生成配置。");
     text = text.replace(
-      "PAYLOAD_SECRET=\n",
-      `PAYLOAD_SECRET=${randomBytes(32).toString("hex")}\n`,
+      secretPlaceholder,
+      (_, ending) => `PAYLOAD_SECRET=${randomBytes(32).toString("hex")}${ending}`,
     );
+  }
   await writeFile(dest, text, { mode: 0o600 });
   console.log(`${app}: 已创建 ${fileURLToPath(dest)}（已被 Git 忽略）`);
 }
