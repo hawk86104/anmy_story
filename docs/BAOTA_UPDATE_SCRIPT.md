@@ -38,6 +38,8 @@ bash deploy/tencent/update-server.sh
 
 Next.js 构建可能把 `apps/cms/next-env.d.ts` 中的 `.next/dev/types/` 改为 `.next/types/`。如果运行前发现这一文件仅有上述 `routes.d.ts` 或 `root-params.d.ts` 路径变化、没有暂存或其他已跟踪文件修改，脚本会在完成前置检查后将它备份到 `/www/backup/anmy_story/logs/next-env-before-update-*.d.ts`，再恢复 Git 中的版本。构建之后也会只在确认变化仅限这些路径时恢复构建前内容；`NEXT_DIST_DIR` 指定的构建目录也会被识别。其他修改会保留并报错。可使用 `git diff -- apps/cms/next-env.d.ts` 查看实际差异。
 
+PM2 守护进程和当前 PM2 命令版本不一致时，`pm2 jlist` 可能在 JSON 旁输出版本提示。脚本会识别该提示并继续校验实际进程列表，不会自动执行 `pm2 update`；如果返回的进程列表无法解析或命令失败，仍会停止并提示检查。
+
 如果日志显示未找到要求的 Node 版本，请先通过宝塔的 Node 版本管理器或现有工具安装项目 `.nvmrc` 所要求的版本。已经安装在非标准位置时，可指定该版本的 `bin` 目录：
 
 ```bash
@@ -69,4 +71,4 @@ PROJECT_DIR=/实际项目目录 BACKUP_ROOT=/实际备份目录 \
 MEDIA_DRAIN_TIMEOUT_SECONDS=1800 bash deploy/tencent/update-server.sh
 ```
 
-本地验证使用隔离 Git 仓库、真实 SQLite 测试库和模拟 PM2 / npm / 网络命令，覆盖快进更新、自动处理 Next.js 类型文件、Node 版本选择、配置和分支不一致、素材缺失、队列超时及迁移失败。尚未连接实际宝塔服务器执行；运行时请根据日志确认真实路径与服务状态。
+本地验证使用隔离 Git 仓库、真实 SQLite 测试库和模拟 PM2 / npm / 网络命令，覆盖快进更新、PM2 版本提示和异常输出、自动处理 Next.js 类型文件、Node 版本选择、配置和分支不一致、素材缺失、队列超时及迁移失败。尚未连接实际宝塔服务器执行；运行时请根据日志确认真实路径与服务状态。

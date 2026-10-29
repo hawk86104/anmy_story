@@ -44,6 +44,33 @@ next_env_paths_only() {
   ' "$1" "$2" "${3:-.next}"
 }
 
+# PM2 可能把版本提示写到 jlist 的标准输出，不能直接当作 JSON。
+# 只移除已知的版本提示；其他输出或无效数据仍报错，避免泄露进程环境变量。
+pm2_jlist() {
+  if pm2 jlist | node -e '
+    const fs = require("node:fs");
+    const output = fs.readFileSync(0, "utf8").replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "");
+    const banner = /(?:^|\r?\n)[ \t]*>>>>[ \t]+In-memory PM2 is out-of-date, do:[ \t]*\r?\n[ \t]*>>>>[ \t]+\$ pm2 update[ \t]*\r?\n[ \t]*In memory PM2 version:[^\r\n]*\r?\n[ \t]*Local PM2 version:[^\r\n]*(?:\r?\n|$)/g;
+    let warnings = 0;
+    const json = output.replace(banner, () => { warnings++; return "\n"; }).trim();
+    let processes;
+    try { processes = JSON.parse(json); } catch {
+      console.error("错误：PM2 进程列表不是有效的 JSON，未输出可能包含密钥的原始内容。");
+      process.exit(1);
+    }
+    if (!Array.isArray(processes)) {
+      console.error("错误：PM2 进程列表不是 JSON 数组。");
+      process.exit(1);
+    }
+    if (warnings) console.error("警告：PM2 守护进程与当前 PM2 命令的版本不同；已识别版本提示，继续核对进程。不会自动更新 PM2。");
+    process.stdout.write(JSON.stringify(processes));
+  '; then
+    return 0
+  fi
+  printf '%s\n' '错误：无法读取 PM2 进程列表，请检查 PM2 状态；不会输出原始进程数据。' >&2
+  return 1
+}
+
 on_error() {
   local code="$1" line="$2"
   trap - ERR INT TERM
@@ -155,11 +182,13 @@ step="核对 PM2、数据库与存储配置"
 # 只输出数据库和目录路径，不输出 .env / PM2 中的密钥。
 runtime_json="$(
   cd -- "$CMS_DIR"
-  pm2 jlist | node -e '
+  pm2_jlist | node -e '
     const fs = require("node:fs"), path = require("node:path");
     const { fileURLToPath } = require("node:url");
     const dotenv = require("dotenv");
-    const apps = JSON.parse(fs.readFileSync(0, "utf8"));
+    const input = fs.readFileSync(0, "utf8");
+    if (!input) process.exit(1);
+    const apps = JSON.parse(input);
     const file = dotenv.parse(fs.readFileSync(".env"));
     const selected = ["anmy-cms", "anmy-media"].map((name) => {
       const matches = apps.filter((app) => app.name === name);
@@ -264,7 +293,7 @@ printf '%s\n' "$old_sha" > "$backup_dir/code-commit.txt"
 printf '%s\n' "$target_sha" > "$backup_dir/target-commit.txt"
 cp -p -- "$ENV_FILE" "$backup_dir/cms.env"
 chmod 600 "$backup_dir/cms.env"
-pm2 jlist | node -e 'const a=JSON.parse(require("node:fs").readFileSync(0,"utf8"));const p=a.filter(x=>["anmy-cms","anmy-media"].includes(x.name));if(p.length!==2)throw new Error("无法备份两个 PM2 进程配置");process.stdout.write(JSON.stringify(p.map(({name,pm2_env})=>({name,pm2_env})),null,2))' > "$backup_dir/pm2-processes.json"
+pm2_jlist | node -e 'const s=require("node:fs").readFileSync(0,"utf8");if(!s)process.exit(1);const a=JSON.parse(s);const p=a.filter(x=>["anmy-cms","anmy-media"].includes(x.name));if(p.length!==2)throw new Error("无法备份两个 PM2 进程配置");process.stdout.write(JSON.stringify(p.map(({name,pm2_env})=>({name,pm2_env})),null,2))' > "$backup_dir/pm2-processes.json"
 chmod 600 "$backup_dir/pm2-processes.json"
 log "已备份后台配置和 PM2 进程配置；环境变量不会输出到日志。"
 log "使用 SQLite 在线备份创建数据库快照。"
@@ -365,7 +394,7 @@ done
 (( healthy == 1 )) || fail "本机后台健康检查失败：$HEALTH_URL；请查看 PM2 日志。"
 log "本机后台健康检查通过，等待进程稳定。"
 sleep 3
-pm2 jlist | node -e 'const a=JSON.parse(require("node:fs").readFileSync(0,"utf8"));for(const n of ["anmy-cms","anmy-media"]){const p=a.filter(x=>x.name===n);if(p.length!==1||p[0].pm2_env?.status!=="online"){console.error(`${n} 未处于 online 状态`);process.exitCode=1}else console.log(`${n}: online`)}'
+pm2_jlist | node -e 'const s=require("node:fs").readFileSync(0,"utf8");if(!s)process.exit(1);const a=JSON.parse(s);for(const n of ["anmy-cms","anmy-media"]){const p=a.filter(x=>x.name===n);if(p.length!==1||p[0].pm2_env?.status!=="online"){console.error(`${n} 未处于 online 状态`);process.exitCode=1}else console.log(`${n}: online`)}'
 pm2 status
 if curl --fail --silent --show-error --max-time 10 "$PUBLIC_HEALTH_URL" >/dev/null; then
   log "公网后台健康地址可访问：$PUBLIC_HEALTH_URL"

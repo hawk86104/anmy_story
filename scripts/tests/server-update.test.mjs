@@ -145,7 +145,11 @@ function fixture() {
     [
       'printf "pm2 %s\\n" "$*" >> "$MOCK_TRACE"',
       'case "$1" in',
-      '  jlist) printf \'[{"name":"anmy-cms","pm2_env":{"status":"online","pm_cwd":"%s"}},{"name":"anmy-media","pm2_env":{"status":"online","pm_cwd":"%s"}}]\' "$MOCK_CMS_DIR" "$MOCK_CMS_DIR" ;;',
+      '  jlist)',
+      '    printf "%s" "${MOCK_PM2_JLIST_PREFIX:-}"',
+      '    if [[ -n "${MOCK_PM2_JLIST_OVERRIDE:-}" ]]; then printf "%s" "$MOCK_PM2_JLIST_OVERRIDE"; else printf \'[{"name":"anmy-cms","pm2_env":{"status":"online","pm_cwd":"%s"}},{"name":"anmy-media","pm2_env":{"status":"online","pm_cwd":"%s"}}]\' "$MOCK_CMS_DIR" "$MOCK_CMS_DIR"; fi',
+      '    printf "%s" "${MOCK_PM2_JLIST_SUFFIX:-}"',
+      '    if [[ "${MOCK_PM2_JLIST_FAIL:-0}" == 1 ]]; then exit 42; fi ;;',
       '  *) printf "mock pm2 %s\\n" "$*" ;;',
       "esac",
     ].join("\n"),
@@ -372,6 +376,57 @@ test(
         );
       } finally {
         cleanup(f.root);
+      }
+    });
+    await t.test("PM2 版本提示位于进程列表前后时仍能完成更新", () => {
+      const f = fixture();
+      try {
+        const banner =
+          "\n\u001b[31m>>>> In-memory PM2 is out-of-date, do:\n" +
+          ">>>> $ pm2 update\u001b[0m\n" +
+          "In memory PM2 version: \u001b[34m5.3.0\u001b[0m\n" +
+          "Local PM2 version: 5.4.0\n\n";
+        const result = run(f, {
+          MOCK_PM2_JLIST_PREFIX: banner,
+          MOCK_PM2_JLIST_SUFFIX: banner,
+        });
+        assert.equal(result.status, 0, result.stderr + result.stdout);
+        assert.equal(
+          (result.stdout.match(/PM2 守护进程与当前 PM2 命令的版本不同/g) || []).length,
+          3,
+        );
+        assert.equal(git(f.work, "rev-parse", "HEAD"), f.targetSha);
+        const trace = readFileSync(f.trace, "utf8");
+        assert.equal((trace.match(/pm2 jlist/g) || []).length, 3);
+        assert.doesNotMatch(trace, /pm2 update|pm2 kill/);
+        assert.match(trace, /pm2 restart/);
+      } finally {
+        cleanup(f.root);
+      }
+    });
+    await t.test("PM2 列表异常或命令失败时停止，且不泄露原始内容", () => {
+      const secret = "private-pm2-test-secret-never-in-output";
+      for (const [scenario, env] of [
+        ["unknown prefix", { MOCK_PM2_JLIST_PREFIX: `[PM2] ${secret}\n` }],
+        ["invalid json", { MOCK_PM2_JLIST_OVERRIDE: `[{"secret":"${secret}"` }],
+        ["not an array", { MOCK_PM2_JLIST_OVERRIDE: `{"secret":"${secret}"}` }],
+        ["command failed", { MOCK_PM2_JLIST_FAIL: "1" }],
+      ]) {
+        const f = fixture();
+        try {
+          const nextEnv = path.join(f.work, "apps", "cms", "next-env.d.ts");
+          const generated = f.originalNextEnv.replaceAll("/dev/types/", "/types/");
+          writeFileSync(nextEnv, generated);
+          const result = run(f, env);
+          assert.notEqual(result.status, 0, scenario);
+          assert.match(result.stdout + result.stderr, /无法读取 PM2 进程列表/, scenario);
+          assert.doesNotMatch(result.stdout + result.stderr, new RegExp(secret), scenario);
+          assert.equal(readFileSync(nextEnv, "utf8"), generated, scenario);
+          assert.equal(git(f.work, "rev-parse", "HEAD"), f.oldSha, scenario);
+          assert.doesNotMatch(readFileSync(f.trace, "utf8"), /pm2 stop|pm2 update/, scenario);
+        } finally {
+          cleanup(f.root);
+        }
       }
     });
     await t.test("更新前自动备份并恢复 Next.js 生成的类型路径", () => {
