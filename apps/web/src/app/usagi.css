@@ -3040,6 +3040,10 @@ input[type="checkbox"] {
 .markdown-editor {
   min-width: 0;
 }
+.markdown-editor .entry-body-input {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .markdown-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -3143,7 +3147,7 @@ input[type="checkbox"] {
 .markdown-body a { color: var(--sage-ink); text-decoration: underline; overflow-wrap: anywhere; }
 .markdown-body img { display: block; max-width: 100%; height: auto; border-radius: 12px; }
 .markdown-body code { padding: 0.1em 0.3em; border-radius: 5px; background: var(--soft); font-size: 0.9em; }
-.markdown-body pre { max-width: 100%; overflow-x: auto; padding: 14px; border-radius: 12px; background: var(--bg); white-space: pre; }
+.markdown-body pre { max-width: 100%; overflow-x: auto; padding: 14px; border-radius: 12px; background: var(--bg); white-space: pre-wrap; overflow-wrap: anywhere; }
 .markdown-body pre code { padding: 0; background: transparent; }
 .markdown-table-wrap { max-width: 100%; overflow-x: auto; margin: 1em 0; }
 .markdown-body table { border-collapse: collapse; min-width: 100%; }
