@@ -183,7 +183,7 @@ const db = new DatabaseSync(file, { readOnly: true });
     [
       'printf "npm %s\\n" "$*" >> "$MOCK_TRACE"',
       'if [[ "$*" == *db:migrate* && "${MOCK_FAIL_MIGRATION:-0}" == 1 ]]; then echo "mock migration failure" >&2; exit 41; fi',
-      'if [[ "$*" == *"build --workspace"* ]]; then sed -i "s|/dev/types/|/types/|g" "$PROJECT_DIR/apps/cms/next-env.d.ts"; if [[ "${MOCK_UNEXPECTED_NEXT_ENV:-0}" == 1 ]]; then printf "// unexpected change\\n" >> "$PROJECT_DIR/apps/cms/next-env.d.ts"; fi; fi',
+      'if [[ "$*" == *"build --workspace"* ]]; then if [[ -n "${MOCK_NEXT_DIST_DIR:-}" ]]; then sed -i "s|\\.next/dev/types/|${MOCK_NEXT_DIST_DIR}/types/|g" "$PROJECT_DIR/apps/cms/next-env.d.ts"; else sed -i "s|/dev/types/|/types/|g" "$PROJECT_DIR/apps/cms/next-env.d.ts"; fi; if [[ "${MOCK_UNEXPECTED_NEXT_ENV:-0}" == 1 ]]; then printf "// unexpected change\\n" >> "$PROJECT_DIR/apps/cms/next-env.d.ts"; fi; fi',
       'printf "mock npm %s\\n" "$*"',
     ].join("\n"),
   );
@@ -206,6 +206,7 @@ const db = new DatabaseSync(file, { readOnly: true });
     "ANMY_UPDATE_LOADED",
     "FFMPEG_PATH",
     "FFPROBE_PATH",
+    "NODE_BIN_DIR",
   ])
     delete env[key];
   Object.assign(env, {
@@ -262,7 +263,7 @@ function cleanup(root) {
 
 test(
   "服务器更新脚本：安全快进、备份、迁移、重启与失败处理",
-  { skip: !bash, timeout: 180000 },
+  { skip: !bash, timeout: 240000 },
   async (t) => {
     await t.test(
       "完整流程使用新 main，保留备份，且自身更新不会中断执行",
@@ -369,6 +370,134 @@ test(
           !existsSync(f.trace) ||
             !readFileSync(f.trace, "utf8").includes("pm2 stop"),
         );
+      } finally {
+        cleanup(f.root);
+      }
+    });
+    await t.test("更新前自动备份并恢复 Next.js 生成的类型路径", () => {
+      const f = fixture();
+      try {
+        const nextEnv = path.join(f.work, "apps", "cms", "next-env.d.ts");
+        const generated = f.originalNextEnv.replaceAll("/dev/types/", "/types/");
+        writeFileSync(nextEnv, generated);
+        const result = run(f);
+        assert.equal(result.status, 0, result.stderr + result.stdout);
+        assert.match(result.stdout, /发现 Next\.js 自动生成的类型路径变化/);
+        assert.match(result.stdout, /已备份并恢复 Next\.js 自动生成的类型路径/);
+        const backup = readdirSync(path.join(f.backup, "logs")).filter((name) =>
+          name.startsWith("next-env-before-update-"),
+        );
+        assert.equal(backup.length, 1);
+        assert.equal(
+          readFileSync(path.join(f.backup, "logs", backup[0]), "utf8"),
+          generated,
+        );
+        assert.equal(readFileSync(nextEnv, "utf8"), f.originalNextEnv);
+        assert.equal(git(f.work, "rev-parse", "HEAD"), f.targetSha);
+      } finally {
+        cleanup(f.root);
+      }
+    });
+    await t.test("自定义构建目录的 Next.js 生成路径也能安全处理", () => {
+      const f = fixture();
+      try {
+        const envFile = path.join(f.work, "apps", "cms", ".env");
+        writeFileSync(envFile, `${readFileSync(envFile, "utf8")}NEXT_DIST_DIR=.next-custom\n`);
+        const nextEnv = path.join(f.work, "apps", "cms", "next-env.d.ts");
+        const changed = f.originalNextEnv.replaceAll(
+          ".next/dev/types/",
+          ".next-custom/types/",
+        );
+        writeFileSync(nextEnv, changed);
+        const result = run(f, { MOCK_NEXT_DIST_DIR: ".next-custom" });
+        assert.equal(result.status, 0, result.stderr + result.stdout);
+        assert.match(result.stdout, /已备份并恢复 Next\.js 自动生成的类型路径/);
+        assert.match(result.stdout, /已恢复 Next\.js 自动改写的类型声明路径/);
+        assert.equal(readFileSync(nextEnv, "utf8"), f.originalNextEnv);
+        const backup = readdirSync(path.join(f.backup, "logs")).find((name) =>
+          name.startsWith("next-env-before-update-"),
+        );
+        assert.equal(readFileSync(path.join(f.backup, "logs", backup), "utf8"), changed);
+      } finally {
+        cleanup(f.root);
+      }
+    });
+    await t.test("Next.js 文件含其他改动、暂存或存在其他修改时不覆盖", () => {
+      for (const scenario of ["custom", "different-path", "staged", "other-file"]) {
+        const f = fixture();
+        try {
+          const nextEnv = path.join(f.work, "apps", "cms", "next-env.d.ts");
+          let changed = f.originalNextEnv.replaceAll("/dev/types/", "/types/");
+          if (scenario === "custom") changed += "// custom change\n";
+          if (scenario === "different-path")
+            changed = changed.replace("./.next/types/", "./other/types/");
+          writeFileSync(nextEnv, changed);
+          if (scenario === "staged") git(f.work, "add", "apps/cms/next-env.d.ts");
+          if (scenario === "other-file")
+            writeFileSync(path.join(f.work, "README.md"), "local changes\n");
+          const result = run(f);
+          assert.notEqual(result.status, 0, scenario);
+          assert.match(result.stdout, /未提交修改/, scenario);
+          assert.equal(readFileSync(nextEnv, "utf8"), changed, scenario);
+          assert.equal(git(f.work, "rev-parse", "HEAD"), f.oldSha, scenario);
+          assert.ok(
+            !existsSync(f.trace) || !readFileSync(f.trace, "utf8").includes("pm2 stop"),
+            scenario,
+          );
+        } finally {
+          cleanup(f.root);
+        }
+      }
+    });
+    await t.test("指定版本不存在时停止，保留未处理的 Next.js 文件", () => {
+      const f = fixture();
+      try {
+        const nextEnv = path.join(f.work, "apps", "cms", "next-env.d.ts");
+        const changed = f.originalNextEnv.replaceAll("/dev/types/", "/types/");
+        writeFileSync(nextEnv, changed);
+        writeExecutable(
+          path.join(f.env.MOCK_BIN, "node"),
+          'if [[ "${1:-}" == "--version" ]]; then echo v0.0.0; exit; fi\nexec "$MOCK_REAL_NODE" "$@"',
+        );
+        const result = run(f, {
+          MOCK_REAL_NODE: process.execPath,
+          HOME: f.root,
+          NVM_DIR: path.join(f.root, "missing-nvm"),
+        });
+        assert.notEqual(result.status, 0);
+        assert.match(result.stdout, /未找到项目要求的 Node/);
+        assert.equal(readFileSync(nextEnv, "utf8"), changed);
+        assert.equal(git(f.work, "rev-parse", "HEAD"), f.oldSha);
+        assert.ok(
+          !existsSync(f.trace) || !readFileSync(f.trace, "utf8").includes("pm2 stop"),
+        );
+      } finally {
+        cleanup(f.root);
+      }
+    });
+    await t.test("从 NODE_BIN_DIR 自动选择已安装的指定 Node 版本", () => {
+      const f = fixture();
+      try {
+        writeExecutable(
+          path.join(f.env.MOCK_BIN, "node"),
+          'if [[ "${1:-}" == "--version" ]]; then echo v0.0.0; exit; fi\nexec "$MOCK_REAL_NODE" "$@"',
+        );
+        const bin = path.join(f.root, "correct-node-bin");
+        mkdirSync(bin);
+        writeExecutable(path.join(bin, "node"), 'exec "$MOCK_REAL_NODE" "$@"');
+        const nodeBin =
+          process.platform === "win32"
+            ? execFileSync(bash, ["-c", 'cygpath -u "$1"', "bash", bin], {
+                encoding: "utf8",
+              }).trim()
+            : bin;
+        const result = run(f, {
+          MOCK_REAL_NODE: process.execPath,
+          NODE_BIN_DIR: nodeBin,
+        });
+        assert.equal(result.status, 0, result.stderr + result.stdout);
+        assert.match(result.stdout, /本次更新使用已安装的 Node/);
+        assert.equal(git(f.work, "rev-parse", "HEAD"), f.targetSha);
       } finally {
         cleanup(f.root);
       }

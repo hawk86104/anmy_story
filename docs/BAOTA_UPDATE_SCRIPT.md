@@ -27,8 +27,8 @@ bash deploy/tencent/update-server.sh
 
 ## 执行过程
 
-1. 检查 Git、Node、npm、PM2、SQLite、curl 等工具，以及两个 PM2 进程的工作目录和实际配置。Node 版本必须与远端 `main` 的 `.nvmrc` 一致。
-2. 获取 `origin/main`，核对服务器当前提交和本地 `main` 都能安全快进。已跟踪文件有未提交修改、分支存在未合并提交，或 PM2 配置与当前终端不一致时，会直接停止，不执行强制重置。
+1. 检查 Git、Node、npm、PM2、SQLite、curl 等工具，以及两个 PM2 进程的工作目录和实际配置。Node 版本必须与远端 `main` 的 `.nvmrc` 一致；当前版本不符时，会尝试查找常见安装目录中的指定版本，只在本次脚本内调整 `PATH`。
+2. 获取 `origin/main`，核对服务器当前提交和本地 `main` 都能安全快进。遇到一般的已跟踪文件未提交修改、分支存在未合并提交，或 PM2 配置与当前终端不一致时，会直接停止，不执行强制重置。对于下文列出的 Next.js 自动生成路径变化，脚本会先备份并恢复该文件。
 3. 暂停 `anmy-cms`，让 `anmy-media` 继续处理现有视频队列。队列清空后停止媒体进程。默认最多等待 900 秒，等待期间会打印剩余数量。
 4. 按服务器实际 `.env` 和 PM2 环境识别数据库、素材及原件路径。备份 SQLite 并执行 `quick_check`，备份 `.env`、PM2 进程配置和存在的本地素材目录；数据库仍引用本地素材而对应目录不存在时停止。COS 云端对象不包含在这份服务器目录备份中，本地素材目录内的符号链接会保留为链接，链接目标需另行备份。
 5. 切换到本地 `main` 并以 `--ff-only` 合并目标提交；执行 `npm ci --include=dev`、Payload 生产迁移及后台构建。
@@ -36,7 +36,15 @@ bash deploy/tencent/update-server.sh
 
 更新期间后台接口会暂时不可用。脚本不会重新执行 `setup`、`seed`、开发数据库同步或数据库重置，也不会主动迁移、删除 COS 或本地素材。
 
-Next.js 构建可能自动改写 `apps/cms/next-env.d.ts` 的类型路径。脚本只在确认变化仅限这些自动生成路径时恢复构建前内容；若构建修改其他受 Git 跟踪的内容，会保留现场并停止，以免下一次更新覆盖真实改动。
+Next.js 构建可能把 `apps/cms/next-env.d.ts` 中的 `.next/dev/types/` 改为 `.next/types/`。如果运行前发现这一文件仅有上述 `routes.d.ts` 或 `root-params.d.ts` 路径变化、没有暂存或其他已跟踪文件修改，脚本会在完成前置检查后将它备份到 `/www/backup/anmy_story/logs/next-env-before-update-*.d.ts`，再恢复 Git 中的版本。构建之后也会只在确认变化仅限这些路径时恢复构建前内容；`NEXT_DIST_DIR` 指定的构建目录也会被识别。其他修改会保留并报错。可使用 `git diff -- apps/cms/next-env.d.ts` 查看实际差异。
+
+如果日志显示未找到要求的 Node 版本，请先通过宝塔的 Node 版本管理器或现有工具安装项目 `.nvmrc` 所要求的版本。已经安装在非标准位置时，可指定该版本的 `bin` 目录：
+
+```bash
+NODE_BIN_DIR=/实际Node版本目录/bin bash deploy/tencent/update-server.sh
+```
+
+脚本会验证目录中的 `node --version`，不会安装或修改服务器的全局 Node 配置。请仍使用管理现有 PM2 的用户运行；若刚推送的是新脚本，应在前面的首次命令中把最后一行改为 `NODE_BIN_DIR=/实际Node版本目录/bin bash "$BOOTSTRAP"`。
 
 ## 日志、备份与失败处理
 
@@ -61,4 +69,4 @@ PROJECT_DIR=/实际项目目录 BACKUP_ROOT=/实际备份目录 \
 MEDIA_DRAIN_TIMEOUT_SECONDS=1800 bash deploy/tencent/update-server.sh
 ```
 
-本地验证使用了隔离 Git 仓库、真实 SQLite 测试库和模拟 PM2 / npm / 网络命令，覆盖快进更新、配置和分支不一致、素材缺失、队列超时及迁移失败。尚未连接实际宝塔服务器执行；首次运行请根据日志确认真实路径与服务状态。
+本地验证使用隔离 Git 仓库、真实 SQLite 测试库和模拟 PM2 / npm / 网络命令，覆盖快进更新、自动处理 Next.js 类型文件、Node 版本选择、配置和分支不一致、素材缺失、队列超时及迁移失败。尚未连接实际宝塔服务器执行；运行时请根据日志确认真实路径与服务状态。

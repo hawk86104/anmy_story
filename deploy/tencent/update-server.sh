@@ -29,9 +29,20 @@ target_sha=""
 cms_stopped=0
 media_stopped=0
 changes_started=0
+next_env_needs_restore=0
 
 log() { printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"; }
 fail() { log "错误：$*"; return 1; }
+next_env_paths_only() {
+  node -e '
+    const fs = require("node:fs");
+    const read = (p) => fs.readFileSync(p === "-" ? 0 : p, "utf8");
+    const dirs = new Set([".next", process.argv[3] || ".next"]);
+    const normalize = (s) => s.replace(/\r\n/g, "\n").replace(/^(import ["\x27])(\.\/[^"\x27\r\n]+\/types\/(routes|root-params)\.d\.ts)(["\x27];?)$/gm,
+      (whole, start, path, kind, end) => [...dirs].some((dir) => path === `./${dir}/types/${kind}.d.ts` || path === `./${dir}/dev/types/${kind}.d.ts`) ? `${start}NEXT_GENERATED_TYPE_${kind}${end}` : whole);
+    if (normalize(read(process.argv[1])) !== normalize(read(process.argv[2]))) process.exitCode = 1;
+  ' "$1" "$2" "${3:-.next}"
+}
 
 on_error() {
   local code="$1" line="$2"
@@ -90,9 +101,15 @@ exec 9>"$BACKUP_ROOT/.update.lock"
 flock -n 9 || fail "已有另一个更新脚本正在运行。"
 
 step="检查 Git 并获取主分支"
-if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
-  git status --short --untracked-files=no
-  fail "服务器存在已跟踪文件的未提交修改；请先保存并处理，脚本不会覆盖或重置它们。"
+tracked_changes="$(git status --porcelain --untracked-files=no)"
+if [[ -n "$tracked_changes" ]]; then
+  if [[ "$tracked_changes" == " M apps/cms/next-env.d.ts" ]]; then
+    next_env_needs_restore=1
+    log "发现 next-env.d.ts 未提交修改；完成配置检查后核实是否为 Next.js 自动生成的路径。"
+  else
+    git status --short --untracked-files=no
+    fail "服务器存在非预期的已跟踪文件未提交修改；请先保存并处理，脚本不会覆盖或重置它们。"
+  fi
 fi
 old_sha="$(git rev-parse HEAD^{commit})"
 current_branch="$(git branch --show-current)"
@@ -107,7 +124,31 @@ if git show-ref --verify --quiet refs/heads/main; then
 fi
 required_node="$(git show "$target_sha:.nvmrc" | tr -d '[:space:]')"
 actual_node="$(node --version)"
-[[ "${actual_node#v}" == "${required_node#v}" ]] || fail "Node 版本不符：当前 $actual_node，目标代码要求 $required_node。"
+if [[ "${actual_node#v}" != "${required_node#v}" ]]; then
+  log "当前 Node 为 $actual_node，目标代码要求 $required_node；尝试使用已安装的对应版本。"
+  node_candidates=(
+    "${NODE_BIN_DIR:-}"
+    "${NVM_DIR:-${HOME:-}/.nvm}/versions/node/v${required_node#v}/bin"
+    "${HOME:-}/.nvm/versions/node/v${required_node#v}/bin"
+    "/www/server/nvm/versions/node/v${required_node#v}/bin"
+    "/www/server/nodejs/v${required_node#v}/bin"
+    "/www/server/nodejs/${required_node#v}/bin"
+  )
+  for candidate in "${node_candidates[@]}"; do
+    [[ -n "$candidate" && -x "$candidate/node" ]] || continue
+    candidate_version="$("$candidate/node" --version 2>/dev/null || true)"
+    if [[ "${candidate_version#v}" == "${required_node#v}" ]]; then
+      export PATH="$candidate:$PATH"
+      hash -r
+      actual_node="$(node --version)"
+      log "本次更新使用已安装的 Node：$actual_node（$candidate）。"
+      break
+    fi
+  done
+fi
+[[ "${actual_node#v}" == "${required_node#v}" ]] || fail "未找到项目要求的 Node $required_node。请切换宝塔 Node 版本，或设置 NODE_BIN_DIR 为该版本的 bin 目录后重试。"
+command -v npm >/dev/null 2>&1 || fail "切换 Node 后找不到 npm。"
+command -v pm2 >/dev/null 2>&1 || fail "切换 Node 后找不到原用户的 pm2 命令。"
 log "Git 和 Node 版本检查通过；不使用强制重置。"
 
 step="核对 PM2、数据库与存储配置"
@@ -148,13 +189,14 @@ runtime_json="$(
     const media = path.resolve(process.cwd(), value("MEDIA_ROOT") || "./media");
     const originals = path.resolve(process.cwd(), value("ORIGINALS_ROOT") || `${media}-originals`);
     const storage = value("MEDIA_STORAGE") || "local";
+    const nextDistDir = path.relative(process.cwd(), path.resolve(process.cwd(), value("NEXT_DIST_DIR") || ".next")).split(path.sep).join("/") || ".";
     const commandPath = (v) => v.includes("/") ? path.resolve(process.cwd(), v) : v;
     const ffmpeg = commandPath(value("FFMPEG_PATH") || "ffmpeg"), ffprobe = commandPath(value("FFPROBE_PATH") || "ffprobe");
-    for (const item of [db, media, originals, storage, ffmpeg, ffprobe]) if (/[\r\n]/.test(item)) throw new Error("数据库或存储路径包含换行，无法安全处理。");
-    process.stdout.write(JSON.stringify({ db, media, originals, storage, ffmpeg, ffprobe }));
+    for (const item of [db, media, originals, storage, ffmpeg, ffprobe, nextDistDir]) if (/[\r\n]/.test(item)) throw new Error("数据库或存储路径包含换行，无法安全处理。");
+    process.stdout.write(JSON.stringify({ db, media, originals, storage, ffmpeg, ffprobe, nextDistDir }));
   '
 )"
-config_lines="$(printf '%s' "$runtime_json" | node -e 'const x=JSON.parse(require("node:fs").readFileSync(0,"utf8")); console.log([x.db,x.media,x.originals,x.storage,x.ffmpeg,x.ffprobe].join("\n"));')"
+config_lines="$(printf '%s' "$runtime_json" | node -e 'const x=JSON.parse(require("node:fs").readFileSync(0,"utf8")); console.log([x.db,x.media,x.originals,x.storage,x.ffmpeg,x.ffprobe,x.nextDistDir].join("\n"));')"
 mapfile -t config <<< "$config_lines"
 DB_PATH="${config[0]}"
 MEDIA_ROOT="${config[1]}"
@@ -162,6 +204,7 @@ ORIGINALS_ROOT="${config[2]}"
 STORAGE_MODE="${config[3]}"
 FFMPEG_BIN="${config[4]}"
 FFPROBE_BIN="${config[5]}"
+next_generated_dist_dir="${config[6]}"
 [[ -f "$DB_PATH" ]] || fail "数据库文件不存在：$DB_PATH；不会创建新库。"
 command -v "$FFMPEG_BIN" >/dev/null 2>&1 || fail "找不到 FFmpeg：$FFMPEG_BIN；请检查媒体进程使用的 PATH 或 FFMPEG_PATH。"
 command -v "$FFPROBE_BIN" >/dev/null 2>&1 || fail "找不到 FFprobe：$FFPROBE_BIN；请检查媒体进程使用的 PATH 或 FFPROBE_PATH。"
@@ -169,6 +212,24 @@ log "PM2 的两个进程均为 online，工作目录与配置一致。"
 log "数据库：$DB_PATH；本地素材：$MEDIA_ROOT；本地原件：$ORIGINALS_ROOT；存储模式：$STORAGE_MODE"
 log "FFmpeg：$(command -v "$FFMPEG_BIN")；FFprobe：$(command -v "$FFPROBE_BIN")"
 pm2 status
+
+if [[ "$next_env_needs_restore" == 1 ]]; then
+  step="备份 Next.js 自动生成的类型文件"
+  if ! git show HEAD:apps/cms/next-env.d.ts | next_env_paths_only - "$CMS_DIR/next-env.d.ts" "$next_generated_dist_dir"; then
+    git status --short --untracked-files=no
+    fail "next-env.d.ts 存在非预期的未提交修改；请先保存并处理，脚本不会覆盖或重置它。"
+  fi
+  log "发现 Next.js 自动生成的类型路径变化；先备份，再恢复该文件。"
+  next_env_backup="$BACKUP_ROOT/logs/next-env-before-update-$(date +%Y%m%d-%H%M%S)-$$.d.ts"
+  cp -p -- "$CMS_DIR/next-env.d.ts" "$next_env_backup"
+  chmod 600 "$next_env_backup"
+  git show HEAD:apps/cms/next-env.d.ts | next_env_paths_only - "$next_env_backup" "$next_generated_dist_dir" || fail "next-env.d.ts 已发生其他变化，未覆盖；备份：$next_env_backup"
+  cmp -s -- "$next_env_backup" "$CMS_DIR/next-env.d.ts" || fail "next-env.d.ts 在检查时发生变化，未覆盖；备份：$next_env_backup"
+  [[ "$(git status --porcelain --untracked-files=no)" == " M apps/cms/next-env.d.ts" ]] || fail "Git 工作区在检查时发生变化，未覆盖；备份：$next_env_backup"
+  git restore --worktree -- apps/cms/next-env.d.ts
+  [[ -z "$(git status --porcelain --untracked-files=no)" ]] || fail "Git 工作区仍有未提交修改，请先检查。"
+  log "已备份并恢复 Next.js 自动生成的类型路径：$next_env_backup"
+fi
 
 step="暂停后台写入并等待媒体队列"
 log "停止 anmy-cms，媒体进程继续工作，等待排队和处理中的视频完成。"
@@ -279,14 +340,7 @@ fi
 NODE_ENV=production npm run build --workspace @mylife/cms
 if [[ -f "$backup_dir/next-env.before-build.d.ts" && -f "$CMS_DIR/next-env.d.ts" ]] &&
   ! cmp -s -- "$backup_dir/next-env.before-build.d.ts" "$CMS_DIR/next-env.d.ts"; then
-  node -e '
-    const fs = require("node:fs");
-    const normalize = (s) => s.replace(/\r\n/g, "\n").replace(/^import ["\x27]\.\/[^"\x27\r\n]+\/types\/(routes|root-params)\.d\.ts["\x27];?$/gm, "NEXT_GENERATED_TYPE_$1");
-    if (normalize(fs.readFileSync(process.argv[1], "utf8")) !== normalize(fs.readFileSync(process.argv[2], "utf8"))) {
-      console.error("next-env.d.ts 含有超出 Next.js 自动类型路径的变化，未自动覆盖。")
-      process.exitCode = 1;
-    }
-  ' "$backup_dir/next-env.before-build.d.ts" "$CMS_DIR/next-env.d.ts"
+  next_env_paths_only "$backup_dir/next-env.before-build.d.ts" "$CMS_DIR/next-env.d.ts" "$next_generated_dist_dir" || fail "next-env.d.ts 含有超出 Next.js 自动类型路径的变化，未自动覆盖。"
   cp -p -- "$backup_dir/next-env.before-build.d.ts" "$CMS_DIR/next-env.d.ts"
   log "已恢复 Next.js 自动改写的类型声明路径，避免下次更新误报本地修改。"
 fi
