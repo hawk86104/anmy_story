@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { PublicNavigationProvider } from "@/components/public-navigation";
 import "./globals.css";
 import "./usagi.css";
 export const metadata: Metadata = {
@@ -23,7 +24,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="zh-CN">
-      <body>{children}</body>
+      <body>
+        <PublicNavigationProvider>{children}</PublicNavigationProvider>
+      </body>
     </html>
   );
 }

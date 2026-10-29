@@ -39,6 +39,7 @@ import { EntryEditor } from "./entry-editor";
 import { MarkdownContent } from "./markdown-content";
 import { EmptyState } from "./theme";
 import { FamilyDataManagement } from "./family-data-management";
+import { NavigationFeedback } from "./navigation-feedback";
 
 const links = [
   { href: "/app/manage", label: "概览", icon: LayoutGrid },
@@ -100,6 +101,7 @@ export function ManageShell({ children }: { children: React.ReactNode }) {
           >
             <l.icon size={16} />
             {l.label}
+            <NavigationFeedback />
           </Link>
         ))}
       </nav>

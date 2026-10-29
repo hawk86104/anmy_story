@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect } from "react";
 import {
   ArrowRight,
   BookOpen,
@@ -13,6 +14,8 @@ import {
 } from "lucide-react";
 import type { SpaceProfile } from "@mylife/shared";
 import { Brand } from "./brand";
+import { NavigationFeedback } from "./navigation-feedback";
+import { usePublicNavigation } from "./public-navigation";
 
 export function SiteShell({
   profile,
@@ -22,6 +25,8 @@ export function SiteShell({
   children: React.ReactNode;
 }) {
   const path = usePathname();
+  const { rememberProfile } = usePublicNavigation();
+  useEffect(() => rememberProfile(profile), [profile, rememberProfile]);
   const nav = [
     { href: "/", label: "主页", mobile: "主页", icon: House, enabled: true },
     {
@@ -68,11 +73,12 @@ export function SiteShell({
                 aria-current={selected(n.href) ? "page" : undefined}
               >
                 {n.label}
+                <NavigationFeedback />
               </Link>
             ))}
           </nav>
           <Link className="site-space-link" href="/app">
-            我的空间 <ArrowRight size={17} />
+            我的空间 <ArrowRight size={17} /> <NavigationFeedback />
           </Link>
           <details className="site-menu">
             <summary aria-label="打开网站菜单">
@@ -82,10 +88,12 @@ export function SiteShell({
               {nav.map((n) => (
                 <Link href={n.href} key={n.href}>
                   {n.label}
+                  <NavigationFeedback />
                 </Link>
               ))}
               <Link href="/app">
                 进入我的空间 <ArrowRight size={16} />
+                <NavigationFeedback />
               </Link>
             </div>
           </details>
@@ -109,6 +117,7 @@ export function SiteShell({
           >
             <n.icon size={21} />
             <span>{n.mobile}</span>
+            <NavigationFeedback />
           </Link>
         ))}
       </nav>

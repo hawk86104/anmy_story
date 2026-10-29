@@ -28,6 +28,7 @@ import { SiteShell } from "./site-shell";
 import { EmptyState, Usagi, themeAssets } from "./theme";
 import { EntryArtwork, EntryCard } from "./entry-card";
 import { MediaView } from "./media-view";
+import { NavigationFeedback } from "./navigation-feedback";
 
 type Query = Record<string, string | string[] | undefined>;
 const str = (q: Query, key: string) =>
@@ -73,6 +74,7 @@ function Pagination({
         <Link className="secondary-button" href={href(data.page - 1)}>
           <ArrowLeft size={16} />
           上一页
+          <NavigationFeedback />
         </Link>
       )}
       <span>
@@ -81,20 +83,21 @@ function Pagination({
       {data.hasNextPage && (
         <Link className="secondary-button" href={href(data.page + 1)}>
           再往前翻翻 <ArrowRight size={16} />
+          <NavigationFeedback />
         </Link>
       )}
     </nav>
   );
 }
 export async function PublicHome() {
-  const profile = await publicProfile();
   let error = "";
-  const records = await publicApi<PageData<PublicEntry>>(
-    "/entries?limit=3",
-  ).catch((e) => {
-    error = e.message;
-    return emptyPage<PublicEntry>();
-  });
+  const [profile, records] = await Promise.all([
+    publicProfile(),
+    publicApi<PageData<PublicEntry>>("/entries?limit=3").catch((e) => {
+      error = e.message;
+      return emptyPage<PublicEntry>();
+    }),
+  ]);
   return (
     <SiteShell profile={profile}>
       <main className="site-main site-home">
@@ -225,8 +228,6 @@ export async function PublicCollection({
   mode: "timeline" | "works" | "honors";
   query: Query;
 }) {
-  const profile = await publicProfile();
-  if (!profile.modules[mode]) notFound();
   const info = {
     timeline: [
       "成长的每一步，都值得留下。",
@@ -253,12 +254,16 @@ export async function PublicCollection({
   if (str(query, "q")) p.set("q", str(query, "q"));
   if (str(query, "year")) p.set("year", str(query, "year"));
   let error = "";
-  const data = await publicApi<PageData<PublicEntry>>(`/entries?${p}`).catch(
-    (e) => {
+  const [profile, data] = await Promise.all([
+    publicProfile().then((result) => {
+      if (!result.modules[mode]) notFound();
+      return result;
+    }),
+    publicApi<PageData<PublicEntry>>(`/entries?${p}`).catch((e) => {
       error = e.message;
       return emptyPage<PublicEntry>();
-    },
-  );
+    }),
+  ]);
   const route = `/${mode}`;
   const groups = data.docs.reduce<Record<string, PublicEntry[]>>((all, e) => {
     const y =
@@ -420,19 +425,21 @@ function ProjectCard({ project: p }: { project: GrowthProject }) {
   );
 }
 export async function PublicProjects({ query }: { query: Query }) {
-  const profile = await publicProfile();
-  if (!profile.modules.projects) notFound();
   let error = "";
   const p = new URLSearchParams({
     page: str(query, "page") || "1",
     status: str(query, "status"),
   });
-  const data = await publicApi<PageData<GrowthProject>>(`/projects?${p}`).catch(
-    (e) => {
+  const [profile, data] = await Promise.all([
+    publicProfile().then((result) => {
+      if (!result.modules.projects) notFound();
+      return result;
+    }),
+    publicApi<PageData<GrowthProject>>(`/projects?${p}`).catch((e) => {
       error = e.message;
       return emptyPage<GrowthProject>();
-    },
-  );
+    }),
+  ]);
   return (
     <SiteShell profile={profile}>
       <main className="site-main site-list-page">
@@ -452,6 +459,7 @@ export async function PublicProjects({ query }: { query: Query }) {
               key={v}
             >
               {l}
+              <NavigationFeedback />
             </Link>
           ))}
         </div>
@@ -477,17 +485,35 @@ export async function PublicProjects({ query }: { query: Query }) {
   );
 }
 export async function PublicProjectDetail({ id }: { id: string }) {
-  const profile = await publicProfile();
-  if (!profile.modules.projects) notFound();
-  const project = await publicApi<GrowthProject>(
+  // Start all independent requests together, while preserving the existing
+  // module and project checks before surfacing any related-list error.
+  const profileRequest = publicProfile();
+  const projectRequest = publicApi<GrowthProject>(
     `/projects/${encodeURIComponent(id)}`,
-  ).catch((e) => {
-    if (e.message === "not-found") notFound();
-    throw e;
-  });
-  const related = await publicApi<PageData<PublicEntry>>(
-    `/entries?project=${encodeURIComponent(id)}&limit=60`,
+  ).then(
+    (value) => ({ ok: true as const, value }),
+    (error: unknown) => ({ ok: false as const, error }),
   );
+  const relatedRequest = publicApi<PageData<PublicEntry>>(
+    `/entries?project=${encodeURIComponent(id)}&limit=60`,
+  ).then(
+    (value) => ({ ok: true as const, value }),
+    (error: unknown) => ({ ok: false as const, error }),
+  );
+  const profile = await profileRequest;
+  if (!profile.modules.projects) notFound();
+  const projectResult = await projectRequest;
+  if (!projectResult.ok) {
+    if (
+      projectResult.error instanceof Error &&
+      projectResult.error.message === "not-found"
+    ) notFound();
+    throw projectResult.error;
+  }
+  const relatedResult = await relatedRequest;
+  if (!relatedResult.ok) throw relatedResult.error;
+  const project = projectResult.value;
+  const related = relatedResult.value;
   return (
     <SiteShell profile={profile}>
       <main className="site-main site-project-detail">

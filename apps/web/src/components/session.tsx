@@ -5,6 +5,7 @@ import {
   useEffect,
   useState,
   useCallback,
+  useRef,
 } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import {
@@ -30,14 +31,29 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, []);
   const router = useRouter();
   const pathname = usePathname();
+  const pendingAuth = useRef<Promise<{ user: Member | null }> | null>(null);
+  const authVersion = useRef(0);
   useEffect(() => {
     if (user) void refreshProfile().catch(() => {});
   }, [user?.id, refreshProfile]);
   useEffect(() => {
     let active = true;
-    api<{ user: Member | null }>("/users/me")
+    const version = authVersion.current;
+    if (!pendingAuth.current) {
+      const request = api<{ user: Member | null }>("/users/me");
+      pendingAuth.current = request;
+      void request.then(
+        () => {
+          if (pendingAuth.current === request) pendingAuth.current = null;
+        },
+        () => {
+          if (pendingAuth.current === request) pendingAuth.current = null;
+        },
+      );
+    }
+    pendingAuth.current
       .then((r) => {
-        if (!active) return;
+        if (!active || version !== authVersion.current) return;
         if (!r.user) {
           const entryPath = pathname.match(/^\/app\/entries\/([^/]+)$/);
           router.replace(
@@ -48,7 +64,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         } else setUser(r.user);
       })
       .catch(() => {
-        if (active) setError("暂时无法连接成长空间，请检查网络后重试。");
+        if (active && version === authVersion.current)
+          setError("暂时无法连接成长空间，请检查网络后重试。");
       });
     return () => {
       active = false;
@@ -74,6 +91,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         refreshProfile,
         logout: async () => {
           await api("/users/logout", { method: "POST" });
+          authVersion.current += 1;
+          pendingAuth.current = null;
           setUser(null);
           router.replace("/login");
           router.refresh();

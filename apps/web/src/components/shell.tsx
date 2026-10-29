@@ -19,6 +19,7 @@ import { Brand } from "./brand";
 import { useSession } from "./session";
 import { Usagi } from "./theme";
 import { PwaControls } from "./pwa-controls";
+import { NavigationFeedback } from "./navigation-feedback";
 export function Shell({ children }: { children: React.ReactNode }) {
   const { user, logout } = useSession();
   const path = usePathname();
@@ -55,6 +56,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
               <n.icon size={19} />
               {n.label}
               {path === n.href && <span className="nav-dot" />}
+              <NavigationFeedback />
             </Link>
           ))}
         </nav>
@@ -168,6 +170,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           >
             <n.icon size={21} />
             <span>{n.label}</span>
+            <NavigationFeedback />
           </Link>
         ))}
       </nav>
