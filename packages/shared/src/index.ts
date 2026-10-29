@@ -27,6 +27,9 @@ export const ENTRY_TYPES = [
 export type EntryType = (typeof ENTRY_TYPES)[number]["value"];
 export type DatePrecision = "day" | "month" | "year" | "unknown";
 export type Visibility = "family" | "public";
+// The final ID sort keeps pagination stable when both timestamps are equal.
+export const ENTRY_LIST_SORT = "-occurredAt,-createdAt,-id";
+export const PROJECT_LIST_SORT = "-startedAt,-createdAt,-id";
 export const DEFAULT_ENTRY_TAGS = [
   "日常小事",
   "新的尝试",

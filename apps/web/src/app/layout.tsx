@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import { PublicNavigationProvider } from "@/components/public-navigation";
 import "./globals.css";
 import "./usagi.css";
@@ -26,6 +27,15 @@ export default function RootLayout({
     <html lang="zh-CN">
       <body>
         <PublicNavigationProvider>{children}</PublicNavigationProvider>
+        <Script id="baidu-analytics" strategy="afterInteractive">{`
+          var _hmt = _hmt || [];
+          (function() {
+            var hm = document.createElement("script");
+            hm.src = "https://hm.baidu.com/hm.js?2d2ba1fac39b489ab44585722d6301b2";
+            var s = document.getElementsByTagName("script")[0];
+            s.parentNode.insertBefore(hm, s);
+          })();
+        `}</Script>
       </body>
     </html>
   );

@@ -5,7 +5,7 @@ import type {
   PublicEntry,
   SpaceProfile,
 } from "@mylife/shared";
-import { ENTRY_TYPES } from "@mylife/shared";
+import { ENTRY_LIST_SORT, ENTRY_TYPES, PROJECT_LIST_SORT } from "@mylife/shared";
 import type {
   Entry,
   Media as StoredMedia,
@@ -255,7 +255,8 @@ export const publicEntryEndpoints: Endpoint[] = [
       const r = await req.payload.find({
         collection: "entries",
         where: { and: conditions },
-        sort: "-occurredAt,-createdAt",
+        // Payload's Local API requires an array for multi-field sorting.
+        sort: ENTRY_LIST_SORT.split(","),
         depth: 0,
         limit: num(q.get("limit"), 20, 60),
         page: num(q.get("page"), 1, 100000),
@@ -355,7 +356,7 @@ export const publicEntryEndpoints: Endpoint[] = [
       const r = await req.payload.find({
         collection: "projects",
         where,
-        sort: "-startedAt,-createdAt",
+        sort: PROJECT_LIST_SORT.split(","),
         limit: 20,
         page: num(q.get("page"), 1, 100000),
         depth: 0,

@@ -27,7 +27,7 @@ import {
   Video,
 } from "lucide-react";
 import type { Entry, Media, Member } from "@mylife/shared";
-import { displayDate } from "@mylife/shared";
+import { ENTRY_LIST_SORT, displayDate } from "@mylife/shared";
 import { markdownEntryTitle as entryTitle } from "@/lib/markdown-text";
 import { api, sizeLabel } from "@/lib/api";
 import { apiUrl, mediaUrl } from "@/lib/urls";
@@ -258,7 +258,7 @@ export function ManageEntries() {
       depth: "1",
       limit: "20",
       page: String(page),
-      sort: "-updatedAt",
+      sort: ENTRY_LIST_SORT,
       "where[status][equals]": status,
     });
     if (visibility) p.set("where[visibility][equals]", visibility);

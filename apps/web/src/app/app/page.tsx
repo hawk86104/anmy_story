@@ -13,7 +13,7 @@ import {
   FolderHeart,
   FilePenLine,
 } from "lucide-react";
-import { ENTRY_TYPES, type Entry } from "@mylife/shared";
+import { ENTRY_LIST_SORT, ENTRY_TYPES, type Entry } from "@mylife/shared";
 import { useSession } from "@/components/session";
 import { api } from "@/lib/api";
 import { draftKey, readDraft } from "@/lib/drafts";
@@ -28,7 +28,7 @@ export default function Dashboard() {
   useEffect(() => {
     let active = true;
     api<{ docs: Entry[]; totalDocs: number }>(
-      "/entries?where[status][equals]=saved&sort=-updatedAt&limit=4&depth=1",
+      `/entries?where[status][equals]=saved&sort=${ENTRY_LIST_SORT}&limit=4&depth=1`,
     )
       .then((r) => {
         if (active) {

@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import {
   ENTRY_TYPES,
+  ENTRY_LIST_SORT,
   displayDate,
   entryCover,
 } from "@mylife/shared";
@@ -43,7 +44,7 @@ export default function Timeline() {
     setLoading(true);
     setError("");
     const p = new URLSearchParams({
-      sort: "-occurredAt,-createdAt",
+      sort: ENTRY_LIST_SORT,
       depth: "1",
       limit: "20",
       page: String(page),

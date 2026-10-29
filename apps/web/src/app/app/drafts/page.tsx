@@ -3,7 +3,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, FilePenLine, LoaderCircle, Plus } from "lucide-react";
-import { ENTRY_TYPES, type Entry } from "@mylife/shared";
+import {
+  ENTRY_LIST_SORT,
+  ENTRY_TYPES,
+  displayDate,
+  type Entry,
+} from "@mylife/shared";
 import { useSession } from "@/components/session";
 import { api } from "@/lib/api";
 import { listDeviceDrafts, type Draft } from "@/lib/drafts";
@@ -48,7 +53,7 @@ export default function DraftsPage() {
     setError("");
     const query = new URLSearchParams({
       "where[status][equals]": "draft",
-      sort: "-updatedAt",
+      sort: ENTRY_LIST_SORT,
       limit: "20",
       depth: "1",
       page: String(page),
@@ -121,7 +126,8 @@ export default function DraftsPage() {
                       ENTRY_TYPES.find((type) => type.value === entry.type)
                         ?.label
                     }{" "}
-                    · 更新于 {new Date(entry.updatedAt).toLocaleString("zh-CN")}
+                    · {displayDate(entry)} · 更新于{" "}
+                    {new Date(entry.updatedAt).toLocaleString("zh-CN")}
                   </small>
                 </div>
                 <ArrowRight size={17} />

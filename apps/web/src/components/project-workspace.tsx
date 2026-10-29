@@ -11,7 +11,13 @@ import {
   LockKeyhole,
   Plus,
 } from "lucide-react";
-import type { Entry, GrowthProject, Media } from "@mylife/shared";
+import {
+  ENTRY_LIST_SORT,
+  PROJECT_LIST_SORT,
+  type Entry,
+  type GrowthProject,
+  type Media,
+} from "@mylife/shared";
 import { api } from "@/lib/api";
 import { mediaUrl } from "@/lib/urls";
 import { EmptyState, Usagi } from "./theme";
@@ -28,7 +34,7 @@ export function ProjectWorkspace() {
     let active = true;
     setBusy(true);
     api<{ docs: GrowthProject[]; hasNextPage: boolean }>(
-      `/projects?depth=1&sort=-startedAt,-createdAt&limit=20&page=${page}`,
+      `/projects?depth=1&sort=${PROJECT_LIST_SORT}&limit=20&page=${page}`,
     )
       .then((r) => {
         if (active) {
@@ -152,7 +158,7 @@ export function ProjectEditor({ id }: { id: string }) {
     Promise.all([
       api<GrowthProject>(`/projects/${encodeURIComponent(id)}?depth=1`),
       api<{ docs: Entry[] }>(
-        `/entries?where[or][0][projects][in]=${encodeURIComponent(id)}&where[or][1][mainProject][equals]=${encodeURIComponent(id)}&sort=-occurredAt&depth=1&limit=60`,
+        `/entries?where[or][0][projects][in]=${encodeURIComponent(id)}&where[or][1][mainProject][equals]=${encodeURIComponent(id)}&sort=${ENTRY_LIST_SORT}&depth=1&limit=60`,
       ),
     ])
       .then(([p, r]) => {
