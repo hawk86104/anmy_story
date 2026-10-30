@@ -7,6 +7,7 @@ import {
   BookOpen,
   Clock3,
   Flag,
+  Github,
   House,
   Menu,
   Palette,
@@ -66,7 +67,19 @@ export function SiteShell({
     <div className="theme-scope site" data-theme={profile.theme}>
       <header className="site-header">
         <div className="site-header-inner">
-          <Brand href="/" />
+          <div className="site-header-brand">
+            <Brand href="/" />
+            <a
+              className="site-source-link"
+              href="https://github.com/hawk86104/anmy_story"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="全站开源（在新窗口打开）"
+            >
+              <Github size={15} aria-hidden="true" />
+              全站开源
+            </a>
+          </div>
           <nav className="site-desktop-nav" aria-label="网站导航">
             {nav.map((n) => (
               <Link
