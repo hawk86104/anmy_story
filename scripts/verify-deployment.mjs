@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { parseArgs } from "node:util";
+import { isThemeId } from "@mylife/shared";
 const { values } = parseArgs({
   options: {
     "api-origin": { type: "string" },
@@ -88,7 +89,7 @@ const profile = await request("/public/profile");
 assert.equal(profile.status, 200, "新版公开资料接口不可用，请先升级宝塔后台");
 const space = await profile.json();
 assert.ok(typeof space.displayName === "string" && space.modules);
-assert.ok(["usagi", "hachiware", "chiikawa"].includes(space.theme));
+assert.ok(isThemeId(space.theme));
 for (const field of ["familyId", "owner", "email", "keyCipher"])
   assert.ok(!(field in space), `公开资料不应返回 ${field}`);
 const projects = await request("/public/projects");

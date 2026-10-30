@@ -7,6 +7,7 @@ import { PathnameContext } from "next/dist/shared/lib/hooks-client-context.share
 import { SessionProvider, useSession } from "../components/session.tsx";
 import { PublicNavigationProvider, usePublicNavigation } from "../components/public-navigation.tsx";
 import PublicLoading from "../components/public-loading.tsx";
+import { ThemeHero, ThemeMascot, ThemeProvider } from "../components/theme.tsx";
 
 const profile = {
   displayName: "测试资料", bio: "测试简介", interests: [], theme: "hachiware",
@@ -98,5 +99,53 @@ test("公开加载状态保留上一次的主题和可用导航", async () => {
     assert.equal(document.querySelector('[role="status"]')?.textContent.includes("正在翻开这一页"), true);
     assert.ok(document.querySelector('.site-desktop-nav a[href="/projects"][aria-current="page"]'));
     assert.equal(document.querySelector('.site-desktop-nav a[href="/works"]'), null);
+  });
+});
+
+test("已登录空间等待资料后再显示主题，避免先闪出默认角色", async () => {
+  const previousFetch = globalThis.fetch;
+  let resolveProfile;
+  const user = { id: 1, name: "测试用户", role: "parent", familyId: 1 };
+  globalThis.fetch = (url) => {
+    const path = new URL(String(url), "http://localhost").pathname;
+    if (path === "/api/users/me") return Promise.resolve(new Response(JSON.stringify({ user })));
+    if (path === "/api/family/space") return new Promise((resolve) => { resolveProfile = resolve; });
+    throw new Error(`意外请求 ${path}`);
+  };
+  const router = { replace() {}, refresh() {}, prefetch() {} };
+  try {
+    await withDom(async ({ root, document }) => {
+      await act(async () => root.render(
+        React.createElement(AppRouterContext.Provider, { value: router },
+          React.createElement(PathnameContext.Provider, { value: "/app" },
+            React.createElement(SessionProvider, null, React.createElement(ThemeMascot)))),
+      ));
+      assert.equal(document.querySelector(".theme-scope"), null);
+      assert.equal(document.querySelector(".theme-sticker"), null);
+      await act(async () => resolveProfile(new Response(JSON.stringify({ ...profile, theme: "dashu" }))));
+      assert.equal(document.querySelector(".theme-scope")?.getAttribute("data-theme"), "dashu");
+      assert.equal(document.querySelector(".theme-sticker")?.getAttribute("src"), "/themes/dashu/sticker-journal.webp");
+    });
+  } finally { globalThis.fetch = previousFetch; }
+});
+
+test("主题图片加载失败时使用中性后备图", async () => {
+  await withDom(async ({ root, document }) => {
+    await act(async () => root.render(
+      React.createElement(ThemeProvider, { theme: "dashu" },
+        React.createElement(React.Fragment, null,
+          React.createElement(ThemeHero, { theme: "dashu" }),
+          React.createElement(ThemeMascot))),
+    ));
+    const hero = document.querySelector(".site-hero-picture img");
+    const sticker = document.querySelector(".theme-sticker");
+    await act(async () => {
+      hero.dispatchEvent(new Event("error"));
+      sticker.dispatchEvent(new Event("error"));
+    });
+    assert.equal(hero.getAttribute("src"), "/app-icon.svg");
+    assert.equal(document.querySelector(".site-hero-picture source")?.getAttribute("srcset"), "/app-icon.svg");
+    assert.equal(sticker.getAttribute("src"), "/app-icon.svg");
+    assert.equal(sticker.alt, "成长手记");
   });
 });

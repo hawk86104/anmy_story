@@ -299,7 +299,7 @@ export interface Space {
    * 留空使用主题插画；选择的照片会公开。
    */
   cover?: (number | null) | Media;
-  theme: 'usagi' | 'hachiware' | 'chiikawa';
+  theme: 'usagi' | 'hachiware' | 'chiikawa' | 'dashu';
   modules?: {
     timeline?: boolean | null;
     works?: boolean | null;

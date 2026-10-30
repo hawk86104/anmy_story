@@ -55,8 +55,16 @@ export const THEMES = [
     name: "吉伊的草莓信笺",
     description: "浅粉与奶油白，轻轻写下小心情",
   },
+  {
+    value: "dashu",
+    name: "大鼠的成长手账",
+    description: "奶油白、耳粉与鼠尾草绿，收藏成长的小日子",
+  },
 ] as const;
 export type ThemeId = (typeof THEMES)[number]["value"];
+export function isThemeId(value: unknown): value is ThemeId {
+  return THEMES.some((theme) => theme.value === value);
+}
 export interface GrowthProject {
   id: number;
   title: string;

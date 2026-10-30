@@ -17,7 +17,7 @@ import { ENTRY_LIST_SORT, ENTRY_TYPES, type Entry } from "@mylife/shared";
 import { useSession } from "@/components/session";
 import { api } from "@/lib/api";
 import { draftKey, readDraft } from "@/lib/drafts";
-import { EmptyState, Usagi } from "@/components/theme";
+import { EmptyState, ThemeMascot } from "@/components/theme";
 import { EntryCard } from "@/components/entry-card";
 export default function Dashboard() {
   const { user } = useSession();
@@ -74,7 +74,7 @@ export default function Dashboard() {
             <Plus size={18} />
           </span>
         </div>
-        <Usagi size={190} />
+        <ThemeMascot size={190} />
       </Link>
       <div className="entry-modes">
         {ENTRY_TYPES.map((t) => {

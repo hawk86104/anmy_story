@@ -16,6 +16,7 @@ import type { SpaceProfile } from "@mylife/shared";
 import { Brand } from "./brand";
 import { NavigationFeedback } from "./navigation-feedback";
 import { usePublicNavigation } from "./public-navigation";
+import { ThemeProvider } from "./theme";
 
 export function SiteShell({
   profile,
@@ -61,6 +62,7 @@ export function SiteShell({
   const selected = (href: string) =>
     href === "/" ? path === "/" : path.startsWith(href);
   return (
+    <ThemeProvider theme={profile.theme}>
     <div className="theme-scope site" data-theme={profile.theme}>
       <header className="site-header">
         <div className="site-header-inner">
@@ -122,5 +124,6 @@ export function SiteShell({
         ))}
       </nav>
     </div>
+    </ThemeProvider>
   );
 }

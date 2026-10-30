@@ -261,6 +261,22 @@ test(
             assert.ok(!(key in profile));
         },
       );
+      await t.test("四套主题可保存并在公开资料中读取", async () => {
+        for (const theme of ["usagi", "hachiware", "chiikawa", "dashu"]) {
+          const saved = await (
+            await call(familyEndpoints, "/family/space", child, { theme }, "patch")
+          ).json();
+          assert.equal(saved.theme, theme);
+          const publicProfile = await (
+            await call(publicEntryEndpoints, "/public/profile")
+          ).json();
+          assert.equal(publicProfile.theme, theme);
+        }
+        await assert.rejects(
+          call(familyEndpoints, "/family/space", child, { theme: "unknown" }, "patch"),
+        );
+        await call(familyEndpoints, "/family/space", child, { theme: "hachiware" }, "patch");
+      });
       await t.test(
         "家庭标签支持家长维护、家庭隔离及保留旧记录标签",
         async () => {

@@ -520,6 +520,40 @@ test(
             assert.ok(objects.has(storage.mediaKey(file)));
         },
       );
+      await t.test("大鼠主题随完整备份导出并在整体还原后保留", async () => {
+        const existing = (await payload.find({
+          collection: "spaces",
+          where: { familyId: { equals: family } },
+          depth: 0,
+          overrideAccess: true,
+        })).docs[0];
+        await payload.update({
+          collection: "spaces", id: existing.id,
+          data: { theme: "dashu" }, user: parent, overrideAccess: false,
+        });
+        const { dataset, files } = await createFamilyArchive(
+          await createLocalReq({ user: parent }, payload),
+        );
+        assert.equal(dataset.profile?.theme, "dashu");
+        const dashuZip = new Uint8Array(await new Response(zipArchive(files)).arrayBuffer());
+        await payload.update({
+          collection: "spaces", id: existing.id,
+          data: { theme: "usagi" }, user: parent, overrideAccess: false,
+        });
+        const preview = await (
+          await call("/family/restore/preview", parent, undefined, dashuZip)
+        ).json();
+        await call("/family/restore/apply", parent, {
+          token: preview.token, confirmation: "还原整体备份",
+        });
+        const restored = (await payload.find({
+          collection: "spaces", where: { familyId: { equals: family } },
+          depth: 0, overrideAccess: true,
+        })).docs[0];
+        assert.equal(restored.theme, "dashu");
+        assert.ok(restored.avatar);
+        assert.ok(restored.cover);
+      });
       await t.test(
         "家长清空全部版本、项目与云端素材，保留账号、设置和其他家庭；清理失败可持久重试",
         async () => {
@@ -554,7 +588,7 @@ test(
           });
           assert.equal(spaces.docs[0].avatar, null);
           assert.equal(spaces.docs[0].cover, null);
-          assert.equal(spaces.docs[0].theme, "hachiware");
+          assert.equal(spaces.docs[0].theme, "dashu");
           const nativeVersions = await payload.findVersions({
             collection: "entries",
             where: { "version.familyId": { equals: family } },

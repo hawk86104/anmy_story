@@ -25,7 +25,8 @@ import { mediaUrl } from "@/lib/urls";
 import { markdownEntryTitle as entryTitle, markdownExcerpt } from "@/lib/markdown-text";
 import { MarkdownContent } from "./markdown-content";
 import { SiteShell } from "./site-shell";
-import { EmptyState, Usagi, themeAssets } from "./theme";
+import { EmptyState, ThemeHero, ThemeMascot } from "./theme";
+import { getThemeAssets } from "./theme-assets";
 import { EntryArtwork, EntryCard } from "./entry-card";
 import { MediaView } from "./media-view";
 import { NavigationFeedback } from "./navigation-feedback";
@@ -36,9 +37,11 @@ const str = (q: Query, key: string) =>
 export function PageHero({
   title,
   description,
+  mood = "journal",
 }: {
   title: string;
   description: string;
+  mood?: "journal" | "thinking" | "celebrate";
 }) {
   return (
     <section className="site-mini-hero">
@@ -47,7 +50,7 @@ export function PageHero({
         <h1>{title}</h1>
         <p>{description}</p>
       </div>
-      <Usagi />
+      <ThemeMascot mood={mood} />
     </section>
   );
 }
@@ -98,23 +101,20 @@ export async function PublicHome() {
       return emptyPage<PublicEntry>();
     }),
   ]);
+  const assets = getThemeAssets(profile.theme);
   return (
     <SiteShell profile={profile}>
       <main className="site-main site-home">
         <section
           className={`site-home-hero ${profile.cover ? "custom-cover" : ""}`}
         >
-          <img
-            className="site-hero-picture"
-            src={
-              profile.cover ? mediaUrl(profile.cover.url) : themeAssets.banner
-            }
-            crossOrigin={profile.cover ? "use-credentials" : undefined}
-            alt={profile.cover?.alt || "乌萨奇和朋友们的阳光草地"}
-            fetchPriority="high"
+          <ThemeHero
+            theme={profile.theme}
+            coverUrl={profile.cover ? mediaUrl(profile.cover.url) : undefined}
+            coverAlt={profile.cover?.alt}
           />
           <div className="site-hero-copy">
-            <span className="site-tag">和乌萨奇一起，收藏小日子</span>
+            <span className="site-tag">{assets.heroTag}</span>
             <h1>
               慢慢长大，
               <br />
@@ -148,7 +148,7 @@ export async function PublicHome() {
             {profile.avatar ? (
               <img src={mediaUrl(profile.avatar.url)} alt="公开头像" />
             ) : (
-              <Usagi size={76} />
+              <ThemeMascot size={76} />
             )}
           </div>
           <div className="site-profile-copy">
@@ -276,7 +276,7 @@ export async function PublicCollection({
   return (
     <SiteShell profile={profile}>
       <main className={`site-main site-list-page site-${mode}`}>
-        <PageHero title={info[0]} description={info[1]} />
+        <PageHero title={info[0]} description={info[1]} mood={mode === "honors" ? "celebrate" : "journal"} />
         <form className="site-filters" action={route}>
           <label className="site-search">
             <Search size={18} />
@@ -405,7 +405,7 @@ function ProjectCard({ project: p }: { project: GrowthProject }) {
       ) : (
         <div className="project-cover-fallback">
           <BookOpen size={56} strokeWidth={1.3} />
-          <Usagi size={130} />
+          <ThemeMascot size={130} />
         </div>
       )}
       <div>
@@ -529,7 +529,7 @@ export async function PublicProjectDetail({ id }: { id: string }) {
             />
           ) : (
             <div className="project-cover-fallback">
-              <Usagi size={260} />
+              <ThemeMascot size={260} />
             </div>
           )}
           <div>

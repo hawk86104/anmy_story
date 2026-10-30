@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { Brand } from "./brand";
 import { useSession } from "./session";
-import { Usagi } from "./theme";
+import { ThemeMascot } from "./theme";
 import { PwaControls } from "./pwa-controls";
 import { NavigationFeedback } from "./navigation-feedback";
 export function Shell({ children }: { children: React.ReactNode }) {
@@ -61,7 +61,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
         <div className="sidebar-note">
-          <Usagi size={100} />
+          <ThemeMascot size={100} />
           <p>
             不必每一天都精彩，
             <br />

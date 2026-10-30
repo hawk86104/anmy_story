@@ -5,6 +5,7 @@ import { APIError, type Payload, type PayloadRequest } from "payload";
 import { relationId } from "./access";
 import { randomBytes } from "node:crypto";
 import { encryptServiceKey } from "./ai";
+import { isThemeId } from "@mylife/shared";
 
 type Row = Record<string, any>;
 export async function restoreFamilyArchive(
@@ -475,9 +476,7 @@ export async function restoreFamilyArchive(
       ...(Array.isArray(p.entryTagOptions)
         ? { entryTagOptions: p.entryTagOptions }
         : {}),
-      theme: ["usagi", "hachiware", "chiikawa"].includes(p.theme)
-        ? p.theme
-        : "usagi",
+      theme: isThemeId(p.theme) ? p.theme : "usagi",
       modules: p.modules,
       avatar: mediaMap.get(relationId(p.avatar)) || null,
       cover: mediaMap.get(relationId(p.cover)) || null,

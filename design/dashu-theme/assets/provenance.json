@@ -1,0 +1,39 @@
+{
+  "theme": "dashu",
+  "created": "2026-10-29",
+  "rights": "本项目的原创 AI 生成灰鼠视觉；不是《美叽和大鼠》官方角色或素材。没有使用参考资料中的第三方图片；发布前仍应按实际用途核查权利。",
+  "generator": "Codex built-in image_gen",
+  "assets": [
+    {
+      "files": ["sticker-journal.png", "../../../apps/web/public/themes/dashu/sticker-journal.webp"],
+      "source": "首次生成的透明 PNG；WebP 按比例缩至最长边 512px。",
+      "prompt": "Use case: illustration-story. Asset type: original transparent character illustration for a children's memory-journal website. Design a unique, friendly little grey mouse mascot with a rounded pear-shaped body, soft medium grey fur, large circular warm-pink ears, tiny charcoal nose, a few fine whiskers, and a distinctive small sage-green crossbody satchel. The mouse is happily holding a small cream notebook and a pencil, sitting amid two subtle paper stars. Loosely hand-drawn dark charcoal outlines and matte colored-pencil / gouache texture, charming modern picture-book aesthetic. Full body with ample padding, centered, facing slightly left. Colors: grey #B6B6BA, pink #F4AABB, cream #FFF8F4, sage #E6EDD9. True transparent background, no solid backdrop, no border. No typography, logo, watermark, other characters. This is a new original character and must not reproduce any existing trademarked character or specific recognizable IP."
+    },
+    {
+      "files": ["../../../apps/web/public/themes/dashu/hero-desktop.webp"],
+      "source": "以本项目原创灰鼠透明 PNG 为角色参考，生成独立桌面横幅；缩放并编码为 WebP。",
+      "prompt": "Use case: illustration-story. Asset type: wide desktop website banner background, original children's growth scrapbook theme. Image 1 is the exact original grey mouse mascot reference: retain its appearance, pink round ears, sage crossbody satchel and notebook. A warm cream paper tabletop with subtle blush-pink paper, a few loose paper stars, a sage leaf and small pieces of translucent washi tape. Place the whole mascot on the RIGHT third at a comfortable size, holding the notebook; leave the LEFT 50% almost empty and uniformly pale cream so live website text will remain readable. Wide panoramic composition, matte colored pencil and gouache on paper, friendly, understated, soft hand-drawn outlines. Palette #FFF8F4 #F4AABB #B6B6BA #E6EDD9. No lettering, no words, no UI, no logo, no watermarks; no other characters. Preserve mouse's original identity; do not imitate any existing copyrighted character."
+    },
+    {
+      "files": ["../../../apps/web/public/themes/dashu/hero-mobile.webp"],
+      "source": "以本项目原创灰鼠透明 PNG 为角色参考，单独生成竖版画面；保留底部角色区域并编码为 WebP。",
+      "prompt": "Use case: illustration-story. Asset type: portrait mobile website banner background, original children's growth scrapbook theme. Image 1 is the exact original grey mouse mascot reference: retain its appearance, pink round ears, sage crossbody satchel and notebook. A warm cream paper surface with tiny blush-pink and sage paper decorations. Compose independently for a phone: position the complete mouse in the LOWER RIGHT half with ears and tail fully visible and leave the UPPER 55% very light, plain cream and empty for live text, no subjects underneath the text. Portrait composition, matte colored pencil and gouache on paper, friendly, understated, soft hand-drawn outlines. Palette #FFF8F4 #F4AABB #B6B6BA #E6EDD9. No lettering, no words, no UI, no logo, no watermarks; no other characters. Preserve mouse's original identity; do not imitate any existing copyrighted character."
+    },
+    {
+      "files": ["../../../apps/web/public/themes/dashu/sticker-celebrate.webp"],
+      "source": "以本项目原创灰鼠透明 PNG 为角色参考，生成透明庆祝贴纸；按比例缩小并编码为 WebP。",
+      "prompt": "Use case: illustration-story. Asset type: transparent celebration sticker for a child's memory journal. Image 1 is the original mascot reference: keep the same grey pear-shaped mouse, big pink round ears, tiny charcoal nose, delicate whiskers, and sage crossbody satchel. Show this same mouse happily celebrating a small milestone, sitting and holding one simple cream paper star aloft, with a joyful gentle expression. Full body with generous margin; a couple of tiny paper confetti stars only. Matte colored pencil and gouache, softly hand-drawn charcoal outlines, same palette and character proportions as reference. True transparent background, no text, lettering, logo, watermark, other characters, or imitation of existing intellectual property."
+    },
+    {
+      "files": ["../../../apps/web/public/themes/dashu/sticker-thinking.webp"],
+      "source": "以本项目原创灰鼠透明 PNG 为角色参考，生成透明思考贴纸；按比例缩小并编码为 WebP。",
+      "prompt": "Use case: illustration-story. Asset type: transparent thoughtful sticker for an empty state in a child's memory journal. Image 1 is the original mascot reference: keep the same grey pear-shaped mouse, big pink round ears, tiny charcoal nose, delicate whiskers, and sage crossbody satchel. Show this same mouse sitting calmly with a little cream notebook resting on its lap, one paw against its cheek as it thinks, with a quietly curious and reassuring expression; a single small paper star nearby. Full body with generous margin. Matte colored pencil and gouache, softly hand-drawn charcoal outlines, same palette and character proportions as reference. True transparent background, no text, lettering, logo, watermark, other characters, or imitation of existing intellectual property."
+    },
+    {
+      "files": ["../../../apps/web/public/themes/dashu/paper.svg"],
+      "source": "项目内新建的简单圆点纹样，不包含角色。",
+      "rights": "本项目代码素材。"
+    }
+  ],
+  "brandMark": "继续使用项目已有的非角色 /app-icon.svg。"
+}

@@ -210,7 +210,7 @@ export function ManageOverview() {
           href="/app/manage/themes"
           icon={Palette}
           title="主页与主题"
-          note="乌萨奇、小八与吉伊的三套色彩"
+          note="选择喜欢的主题与主页展示模块"
         />
         <ManageLink
           href="/app/manage/tags"

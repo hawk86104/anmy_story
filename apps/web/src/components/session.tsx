@@ -14,6 +14,7 @@ import {
   type SpaceProfile,
 } from "@mylife/shared";
 import { api } from "@/lib/api";
+import { ThemeProvider } from "./theme";
 const Session = createContext<{
   user: Member;
   logout: () => Promise<void>;
@@ -26,6 +27,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<SpaceProfile & { canEdit?: boolean }>(
     DEFAULT_PROFILE,
   );
+  const [profileReady, setProfileReady] = useState(false);
   const refreshProfile = useCallback(async () => {
     setProfile(await api<SpaceProfile & { canEdit: boolean }>("/family/space"));
   }, []);
@@ -34,7 +36,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const pendingAuth = useRef<Promise<{ user: Member | null }> | null>(null);
   const authVersion = useRef(0);
   useEffect(() => {
-    if (user) void refreshProfile().catch(() => {});
+    if (!user) return;
+    let active = true;
+    void refreshProfile().catch(() => {}).finally(() => {
+      if (active) setProfileReady(true);
+    });
+    return () => { active = false; };
   }, [user?.id, refreshProfile]);
   useEffect(() => {
     let active = true;
@@ -71,7 +78,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       active = false;
     };
   }, [router, pathname]);
-  if (!user)
+  if (!user || !profileReady)
     return (
       <main className="loading-screen">
         <div className="loading-sprout">✳</div>
@@ -94,14 +101,17 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
           authVersion.current += 1;
           pendingAuth.current = null;
           setUser(null);
+          setProfileReady(false);
           router.replace("/login");
           router.refresh();
         },
       }}
     >
-      <div className="theme-scope" data-theme={profile.theme}>
-        {children}
-      </div>
+      <ThemeProvider theme={profile.theme}>
+        <div className="theme-scope" data-theme={profile.theme}>
+          {children}
+        </div>
+      </ThemeProvider>
     </Session.Provider>
   );
 }

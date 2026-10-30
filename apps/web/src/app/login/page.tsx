@@ -1,10 +1,9 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, LockKeyhole, Eye, EyeOff } from "lucide-react";
+import { ArrowRight, BookOpen, Sparkles, LockKeyhole, Eye, EyeOff } from "lucide-react";
 import { api } from "@/lib/api";
 import { Brand } from "@/components/brand";
-import { Usagi, themeAssets } from "@/components/theme";
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -35,7 +34,7 @@ export default function Login() {
   return (
     <main className="login-page">
       <div className="login-story">
-        <Brand href="/" />
+        <Brand href="/" neutral />
         <div>
           <span className="eyebrow">A LITTLE TODAY. A LIFETIME TOMORROW.</span>
           <h1>
@@ -48,16 +47,15 @@ export default function Login() {
             <br />
             这里，装着正在长大的你。
           </p>
-          <img
-            className="login-art"
-            src={themeAssets.banner}
-            alt="乌萨奇和朋友们一起收藏成长的记忆"
-          />
+          <div className="login-art login-art-neutral" aria-hidden="true">
+            <BookOpen size={76} strokeWidth={1.2} />
+            <Sparkles size={35} strokeWidth={1.3} />
+          </div>
         </div>
         <small>属于你，也属于未来的你。</small>
       </div>
       <section className="login-form-card">
-        <Usagi size={100} />
+        <img className="login-mark" src="/app-icon.svg" width={76} height={76} alt="" />
         <h2>欢迎回到我的小世界</h2>
         <p>用自己的账号，继续收藏成长。</p>
         <form onSubmit={submit}>

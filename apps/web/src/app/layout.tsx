@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, statusBarStyle: "default", title: "成长手记" },
-  icons: { icon: "/themes/usagi/mark.webp", apple: "/themes/usagi/mark.webp" },
+  icons: { icon: "/app-icon.svg", apple: "/app-icon.svg" },
 };
 export const viewport: Viewport = {
   width: "device-width",

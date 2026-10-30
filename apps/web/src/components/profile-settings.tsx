@@ -7,7 +7,7 @@ import { api } from "@/lib/api";
 import { mediaUrl } from "@/lib/urls";
 import { useSession } from "./session";
 import { MediaPicker } from "./media-picker";
-import { themeAssets } from "./theme";
+import { getThemeAssets } from "./theme-assets";
 
 export function ProfileSettings() {
   const { profile, refreshProfile } = useSession();
@@ -61,7 +61,7 @@ export function ProfileSettings() {
         <section className="settings-panel">
           <img
             className="settings-cover"
-            src={form.cover ? mediaUrl(form.cover.url) : themeAssets.banner}
+            src={form.cover ? mediaUrl(form.cover.url) : getThemeAssets(form.theme).banner}
             crossOrigin={form.cover ? "use-credentials" : undefined}
             alt="当前公开封面"
           />
@@ -192,8 +192,8 @@ export function ThemeSettings() {
             aria-pressed={theme === t.value}
             data-theme={t.value}
           >
-            {t.value === "usagi" ? (
-              <img src={themeAssets.banner} alt="乌萨奇和朋友们的阳光草地" />
+            {getThemeAssets(t.value).preview ? (
+              <img src={getThemeAssets(t.value).preview} alt={getThemeAssets(t.value).bannerAlt} />
             ) : (
               <div className="theme-option-preview">
                 <Flower2 size={58} strokeWidth={1.3} />

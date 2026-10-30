@@ -55,7 +55,7 @@ import { AIAssistant } from "./ai-assistant";
 import { MarkdownEditor } from "./markdown-editor";
 import { MarkdownContent } from "./markdown-content";
 import { markdownExcerpt } from "@/lib/markdown-text";
-import { Usagi } from "./theme";
+import { ThemeMascot } from "./theme";
 import {
   draftKey,
   readDraft,
@@ -1367,7 +1367,7 @@ export function EntryEditor({
           <div className="little-note">
             <span className="note-pin" />
             <span className="eyebrow">A NOTE FOR YOU</span>
-            <Usagi size={120} />
+            <ThemeMascot size={120} />
             <h3>小事，也闪闪发光。</h3>
             <p>
               不必是获奖，不必是第一名。

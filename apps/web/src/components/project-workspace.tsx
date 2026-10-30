@@ -20,7 +20,7 @@ import {
 } from "@mylife/shared";
 import { api } from "@/lib/api";
 import { mediaUrl } from "@/lib/urls";
-import { EmptyState, Usagi } from "./theme";
+import { EmptyState, ThemeMascot } from "./theme";
 import { EntryCard } from "./entry-card";
 import { MediaPicker } from "./media-picker";
 
@@ -83,7 +83,7 @@ export function ProjectWorkspace() {
               {p.cover && typeof p.cover !== "number" ? (
                 <img src={mediaUrl(p.cover.url)} alt={p.cover.alt || p.title} />
               ) : (
-                <Usagi size={80} />
+                <ThemeMascot size={80} />
               )}
               <div className="manage-record-content">
                 <span className="site-tag sage">

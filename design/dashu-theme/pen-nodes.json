@@ -1,0 +1,10 @@
+{
+  "document": "untitled.pen（本地 pen.dev 画布，未包含在仓库中）",
+  "method": "pen.dev MCP",
+  "screens": {
+    "home-desktop": { "node": "R5e0bl", "width": 1440, "export": "exports/home-desktop.png" },
+    "home-mobile": { "node": "ZDShU", "width": 390, "export": "exports/home-mobile.png" }
+  },
+  "validation": { "desktopLayoutIssues": 0, "mobileLayoutIssues": 0 },
+  "note": "画稿中姓名、记录和统计均为示例；插画来源见 assets/provenance.json。"
+}
