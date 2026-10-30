@@ -42,6 +42,8 @@
 
 前台可选接入百度统计：在前台构建环境设置 `NEXT_PUBLIC_BAIDU_ANALYTICS_ID` 为自己的 32 位十六进制站点 ID，留空或格式无效时不会加载统计脚本。该值会出现在浏览器代码中，不是服务端密钥；修改后需要重新构建前台。已部署站点升级前需在 EdgeOne 的环境变量中填写原站点 ID，才能继续统计。启用后会覆盖登录后的家庭空间页面，请按家庭隐私需求决定是否启用。
 
+前台和 EdgeOne 的 `Referrer-Policy` 使用 `strict-origin-when-cross-origin`：跨站 HTTPS 请求发送站点来源，不包含页面路径和查询参数；HTTPS 降级到 HTTP 时不发送来源。不要将其覆盖为 `same-origin` 或 `no-referrer`，否则百度统计请求可能虽返回 200，脚本内容却为空。部署后可在浏览器 Network 面板确认 `hm.js` 响应有 JavaScript 内容、`hm.gif` 等统计请求正常发出，再到百度统计查看实时访客或用[百度统计助手](https://tongji.baidu.com/web/help/article?id=317&type=0)检查 PV 日志。
+
 Next.js 的站内跳转不会重新加载整页；如需统计这些页面浏览，请在百度统计的“管理 → 单页应用设置”中启用单页应用数据统计，避免再添加重复的手动页面浏览跟踪。详情见[百度统计单页应用设置](https://tongji.baidu.com/web/help/article?id=324&type=0)。
 
 ## 备份与边界

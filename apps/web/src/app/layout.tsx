@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import Script from "next/script";
 import { PublicNavigationProvider } from "@/components/public-navigation";
 import "./globals.css";
 import "./usagi.css";
@@ -27,19 +26,25 @@ export default function RootLayout({
   const hasAnalyticsId = /^[a-f0-9]{32}$/i.test(analyticsId);
   return (
     <html lang="zh-CN">
+      <head>
+        {hasAnalyticsId && (
+          <script
+            id="baidu-analytics"
+            dangerouslySetInnerHTML={{
+              __html: `
+var _hmt = _hmt || [];
+(function() {
+  var hm = document.createElement("script");
+  hm.src = "https://hm.baidu.com/hm.js?${analyticsId}";
+  var s = document.getElementsByTagName("script")[0];
+  s.parentNode.insertBefore(hm, s);
+})();`,
+            }}
+          />
+        )}
+      </head>
       <body>
         <PublicNavigationProvider>{children}</PublicNavigationProvider>
-        {hasAnalyticsId && (
-          <Script id="baidu-analytics" strategy="afterInteractive">{`
-          var _hmt = _hmt || [];
-          (function() {
-            var hm = document.createElement("script");
-            hm.src = "https://hm.baidu.com/hm.js?${analyticsId}";
-            var s = document.getElementsByTagName("script")[0];
-            s.parentNode.insertBefore(hm, s);
-          })();
-          `}</Script>
-        )}
       </body>
     </html>
   );
