@@ -38,7 +38,9 @@ next_env_paths_only() {
   node -e '
     const fs = require("node:fs");
     const read = (p) => fs.readFileSync(p === "-" ? 0 : p, "utf8");
-    const dirs = new Set([".next", process.argv[3] || ".next"]);
+    // 3e8b9c3 accidentally committed this temporary build directory. Accept it
+    // so servers on that revision can safely advance to the corrected file.
+    const dirs = new Set([".next", ".next-codex-upload-check", process.argv[3] || ".next"]);
     const normalize = (s) => s.replace(/\r\n/g, "\n").replace(/^(import ["\x27])(\.\/[^"\x27\r\n]+\/types\/(routes|root-params)\.d\.ts)(["\x27];?)$/gm,
       (whole, start, path, kind, end) => [...dirs].some((dir) => path === `./${dir}/types/${kind}.d.ts` || path === `./${dir}/dev/types/${kind}.d.ts`) ? `${start}NEXT_GENERATED_TYPE_${kind}${end}` : whole);
     if (normalize(read(process.argv[1])) !== normalize(read(process.argv[2]))) process.exitCode = 1;

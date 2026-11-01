@@ -36,7 +36,7 @@ bash deploy/tencent/update-server.sh
 
 更新期间后台接口会暂时不可用。脚本不会重新执行 `setup`、`seed`、开发数据库同步或数据库重置，也不会主动迁移、删除 COS 或本地素材。
 
-Next.js 构建可能把 `apps/cms/next-env.d.ts` 中的 `.next/dev/types/` 改为 `.next/types/`。如果运行前发现这一文件仅有上述 `routes.d.ts` 或 `root-params.d.ts` 路径变化、没有暂存或其他已跟踪文件修改，脚本会在完成前置检查后将它备份到 `/www/backup/mylife/logs/next-env-before-update-*.d.ts`，再恢复 Git 中的版本。构建之后也会只在确认变化仅限这些路径时恢复构建前内容；`NEXT_DIST_DIR` 指定的构建目录也会被识别。其他修改会保留并报错。可使用 `git diff -- apps/cms/next-env.d.ts` 查看实际差异。
+Next.js 构建可能把 `apps/cms/next-env.d.ts` 中的 `.next/dev/types/` 改为 `.next/types/`。如果运行前发现这一文件仅有 `routes.d.ts` 或 `root-params.d.ts` 的已知自动生成路径变化、没有暂存或其他已跟踪文件修改，脚本会在完成前置检查后将它备份到 `/www/backup/mylife/logs/next-env-before-update-*.d.ts`，再恢复 Git 中的版本。构建之后也会只在确认变化仅限这些路径时恢复构建前内容；除默认目录和 `NEXT_DIST_DIR` 指定的目录外，还会识别历史提交 `3e8b9c3` 误写入的 `.next-codex-upload-check` 目录，以便从该版本安全更新。其他修改会保留并报错。可使用 `git diff -- apps/cms/next-env.d.ts` 查看实际差异。
 
 PM2 守护进程和当前 PM2 命令版本不一致时，`pm2 jlist` 可能在 JSON 旁输出版本提示。脚本会识别该提示并继续校验实际进程列表，不会自动执行 `pm2 update`；如果返回的进程列表无法解析或命令失败，仍会停止并提示检查。
 
@@ -62,7 +62,27 @@ pm2 logs anmy-media --lines 50 --nostream
 
 日志和备份权限默认仅限当前用户。备份中的 `cms.env` 和 `pm2-processes.json` 可能含服务器密钥，应妥善保管；脚本不会直接打印配置中的密钥。失败时附带的 PM2 原有日志由应用产生，也应注意私密保管。
 
-代码和依赖开始更新**之前**发生错误时，脚本会尝试恢复本次暂停的旧进程。开始切换代码、安装依赖或迁移后失败时，脚本保留故障现场，不自动回滚旧数据库或强行启动旧程序；先查看日志和本轮备份，再按[部署文档的回滚章节](DEPLOY_TENCENT.md#97-更新失败与回滚)处理。启动或健康检查失败时，脚本会同时打印两个 PM2 进程最近的日志。
+代码和依赖开始更新**之前**发生错误时，脚本会尝试恢复本次暂停的旧进程。开始切换代码、安装依赖或迁移后失败时，脚本保留故障现场，不自动回滚旧数据库或强行启动旧程序；先查看日志和本轮备份。除下述已确认的类型文件误报外，按[部署文档的回滚章节](DEPLOY_TENCENT.md#97-更新失败与回滚)处理。启动或健康检查失败时，脚本会同时打印两个 PM2 进程最近的日志。
+
+### 迁移和构建完成后，类型文件检查误报
+
+只有在日志明确显示生产迁移和迁移后数据库 `quick_check` 成功、Next.js 构建成功，且随后仅因 `next-env.d.ts` 的自动类型路径变化中止时，才可按以下步骤恢复当前版本。先使用管理原 PM2 进程的用户检查，确认当前提交与失败日志中的「目标提交」一致，并检查类型文件的差异仅是 `routes.d.ts` / `root-params.d.ts` 的构建目录变化：
+
+```bash
+cd /www/wwwroot/mylife
+git rev-parse HEAD
+git diff -- apps/cms/next-env.d.ts
+pm2 status
+```
+
+确认上述条件后，启动本次已构建的版本并检查健康状态：
+
+```bash
+pm2 restart anmy-cms && pm2 restart anmy-media && pm2 status
+curl -fsS http://127.0.0.1:3001/api/health
+```
+
+健康接口可能需要几秒钟启动；应确认返回的 JSON 包含 `"ok": true`，且两个进程均保持 `online`。检查通过后可执行 `pm2 save`；否则保留日志和本轮备份并查看对应进程日志。不要重新 seed 或重置数据库。恢复服务后，将修复提交推送到 `main`，再使用上面的首次命令从远端取得新脚本；旧脚本无法识别本次历史路径。
 
 需要自定义目录或等待时间时，可以在同一条命令中指定：
 

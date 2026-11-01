@@ -46,7 +46,7 @@ function writeExecutable(file, content) {
   chmodSync(file, 0o755);
 }
 
-function fixture() {
+function fixture({ initialNextEnv, targetNextEnv } = {}) {
   const root = mkdtempSync(path.join(tempBase, "mylife-deploy-test-"));
   const source = path.join(root, "source");
   const remote = path.join(root, "remote.git");
@@ -67,7 +67,7 @@ function fixture() {
     path.join(source, "apps", "cms", "package.json"),
     '{"name":"test-cms"}\n',
   );
-  const originalNextEnv =
+  const originalNextEnv = initialNextEnv ??
     '/// <reference types="next" />\nimport "./.next/dev/types/routes.d.ts";\nimport "./.next/dev/types/root-params.d.ts";\n';
   writeFileSync(
     path.join(source, "apps", "cms", "next-env.d.ts"),
@@ -100,6 +100,8 @@ function fixture() {
   git(work, "config", "core.autocrlf", "false");
   const oldSha = git(work, "rev-parse", "HEAD");
   writeFileSync(path.join(source, "README.md"), "new version\n");
+  if (targetNextEnv !== undefined)
+    writeFileSync(path.join(source, "apps", "cms", "next-env.d.ts"), targetNextEnv);
   writeFileSync(
     path.join(source, "deploy", "tencent", "update-server.sh"),
     `${sourceScript}\n# Updated while the old script is running.\n`,
@@ -187,7 +189,7 @@ const db = new DatabaseSync(file, { readOnly: true });
     [
       'printf "npm %s\\n" "$*" >> "$MOCK_TRACE"',
       'if [[ "$*" == *db:migrate* && "${MOCK_FAIL_MIGRATION:-0}" == 1 ]]; then echo "mock migration failure" >&2; exit 41; fi',
-      'if [[ "$*" == *"build --workspace"* ]]; then if [[ -n "${MOCK_NEXT_DIST_DIR:-}" ]]; then sed -i "s|\\.next/dev/types/|${MOCK_NEXT_DIST_DIR}/types/|g" "$PROJECT_DIR/apps/cms/next-env.d.ts"; else sed -i "s|/dev/types/|/types/|g" "$PROJECT_DIR/apps/cms/next-env.d.ts"; fi; if [[ "${MOCK_UNEXPECTED_NEXT_ENV:-0}" == 1 ]]; then printf "// unexpected change\\n" >> "$PROJECT_DIR/apps/cms/next-env.d.ts"; fi; fi',
+      'if [[ "$*" == *"build --workspace"* ]]; then if [[ -n "${MOCK_NEXT_DIST_DIR:-}" ]]; then sed -i "s|\\.next/dev/types/|${MOCK_NEXT_DIST_DIR}/types/|g" "$PROJECT_DIR/apps/cms/next-env.d.ts"; else sed -i -e "s|/dev/types/|/types/|g" -e "s|\\.next-codex-upload-check/types/|.next/types/|g" "$PROJECT_DIR/apps/cms/next-env.d.ts"; fi; if [[ "${MOCK_UNEXPECTED_NEXT_ENV:-0}" == 1 ]]; then printf "// unexpected change\\n" >> "$PROJECT_DIR/apps/cms/next-env.d.ts"; fi; fi',
       'printf "mock npm %s\\n" "$*"',
     ].join("\n"),
   );
@@ -265,9 +267,18 @@ function cleanup(root) {
   rmSync(resolved, { recursive: true, force: true });
 }
 
+test("后台提交的类型引用不应指向临时构建目录", () => {
+  const nextEnv = readFileSync(new URL("../../apps/cms/next-env.d.ts", import.meta.url), "utf8");
+  for (const kind of ["routes", "root-params"]) {
+    assert.match(nextEnv, new RegExp(`^import "\\./\\.next/(?:dev/)?types/${kind}\\.d\\.ts";$`, "m"));
+  }
+  const tsconfig = JSON.parse(readFileSync(new URL("../../apps/cms/tsconfig.json", import.meta.url), "utf8"));
+  assert.ok(!tsconfig.include.some((entry) => entry.includes(".next-codex-upload-check")));
+});
+
 test(
   "服务器更新脚本：安全快进、备份、迁移、重启与失败处理",
-  { skip: !bash, timeout: 240000 },
+  { skip: !bash, timeout: 360000 },
   async (t) => {
     await t.test(
       "完整流程使用新 main，保留备份，且自身更新不会中断执行",
@@ -449,6 +460,42 @@ test(
         );
         assert.equal(readFileSync(nextEnv, "utf8"), f.originalNextEnv);
         assert.equal(git(f.work, "rev-parse", "HEAD"), f.targetSha);
+      } finally {
+        cleanup(f.root);
+      }
+    });
+    await t.test("从误提交临时构建路径的旧版本更新，保留生产构建后的文件备份", () => {
+      const standard = '/// <reference types="next" />\nimport "./.next/dev/types/routes.d.ts";\nimport "./.next/dev/types/root-params.d.ts";\n';
+      const legacy = standard.replaceAll(".next/dev/types/", ".next-codex-upload-check/types/");
+      const f = fixture({ initialNextEnv: legacy, targetNextEnv: standard });
+      try {
+        const nextEnv = path.join(f.work, "apps", "cms", "next-env.d.ts");
+        const generated = legacy.replaceAll(".next-codex-upload-check/types/", ".next/types/");
+        writeFileSync(nextEnv, generated);
+        const result = run(f);
+        assert.equal(result.status, 0, result.stderr + result.stdout);
+        const backup = readdirSync(path.join(f.backup, "logs")).find((name) =>
+          name.startsWith("next-env-before-update-"),
+        );
+        assert.ok(backup);
+        assert.equal(readFileSync(path.join(f.backup, "logs", backup), "utf8"), generated);
+        assert.equal(readFileSync(nextEnv, "utf8"), standard);
+        assert.equal(git(f.work, "rev-parse", "HEAD"), f.targetSha);
+        assert.match(readFileSync(f.trace, "utf8"), /pm2 restart/);
+      } finally {
+        cleanup(f.root);
+      }
+    });
+    await t.test("目标版本含历史临时构建路径时也能识别生产构建的改写", () => {
+      const standard = '/// <reference types="next" />\nimport "./.next/dev/types/routes.d.ts";\nimport "./.next/dev/types/root-params.d.ts";\n';
+      const legacy = standard.replaceAll(".next/dev/types/", ".next-codex-upload-check/types/");
+      const f = fixture({ targetNextEnv: legacy });
+      try {
+        const result = run(f);
+        assert.equal(result.status, 0, result.stderr + result.stdout);
+        assert.match(result.stdout, /已恢复 Next\.js 自动改写的类型声明路径/);
+        assert.equal(readFileSync(path.join(f.work, "apps", "cms", "next-env.d.ts"), "utf8"), legacy);
+        assert.equal(git(f.work, "status", "--porcelain", "--untracked-files=no"), "");
       } finally {
         cleanup(f.root);
       }
