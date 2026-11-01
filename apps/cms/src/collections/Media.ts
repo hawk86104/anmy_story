@@ -6,6 +6,12 @@ import { APIError } from "payload";
 import { authenticated, member, relationId } from "../lib/access";
 import { publicEntryWhere } from "../lib/public-entries";
 import { mediaReferences, publicDecorativeMedia } from "../lib/media-links";
+import { repairTrailingMediaData } from "../lib/video-upload";
+import {
+  identifyUpload,
+  needsPDFCompatibilityValidation,
+} from "../lib/upload-types";
+import { convertHeic } from "../lib/heic-image";
 import {
   datePrefix,
   mediaRoot,
@@ -121,9 +127,14 @@ export const Media: CollectionConfig = {
       "image/jpeg",
       "image/png",
       "image/webp",
+      "image/gif",
+      "image/avif",
       "video/mp4",
       "video/quicktime",
       "video/webm",
+      "video/matroska",
+      "video/vnd.avi",
+      "video/3gpp",
       "audio/mpeg",
       "audio/mp4",
       "audio/x-m4a",
@@ -175,6 +186,7 @@ export const Media: CollectionConfig = {
     ],
     beforeOperation: [
       async ({ args, operation, req }) => {
+        let operationArgs = args;
         if (
           req.file &&
           req.file.size >
@@ -183,13 +195,57 @@ export const Media: CollectionConfig = {
               1024
         )
           throw new APIError("文件超过上传上限，请选择更小的文件。", 413);
-        if ((operation === "create" || operation === "update") && req.file) {
+        if (operation === "create" || operation === "update") {
           delete req.context._payloadCloudStorage;
           delete req.context.originalUpload;
-          req.file.name = `${randomUUID()}${path.extname(path.basename(req.file.name)).toLowerCase()}`;
+        }
+        if ((operation === "create" || operation === "update") && req.file) {
+          if (!member(req) && !req.context.mediaWorker)
+            throw new APIError("请先登录。", 401);
+          const identified = await identifyUpload(
+            req.file.data,
+            req.file.name,
+            req.file.mimetype,
+          );
+          req.file = {
+            ...req.file,
+            name: `${randomUUID()}${identified.extension}`,
+            mimetype: identified.mime,
+          };
+          if (
+            identified.mime === "application/pdf" &&
+            (await needsPDFCompatibilityValidation(req.file.data))
+          ) {
+            // This request contains a PDF parsed above. Keep its original bytes;
+            // all other uploads retain Payload's normal type restrictions.
+            const upload = operationArgs.collection.config.upload;
+            if (!upload) throw new APIError("素材上传暂不可用。", 503);
+            operationArgs = {
+              ...operationArgs,
+              collection: {
+                ...operationArgs.collection,
+                config: {
+                  ...operationArgs.collection.config,
+                  upload: { ...upload, allowRestrictedFileTypes: true },
+                },
+              },
+            };
+          }
         }
         if (req.context.restoredOriginal)
           req.context.originalUpload = req.context.restoredOriginal;
+        if (
+          operation === "create" &&
+          req.context.restoreArchive &&
+          req.context.restoreOriginal === true &&
+          req.file &&
+          /^(image|video)\//.test(req.file.mimetype)
+        )
+          req.context.originalUpload = {
+            data: req.file.data,
+            name: req.file.name,
+            mimeType: req.file.mimetype,
+          };
         if (
           operation === "create" &&
           !req.context.restoreArchive &&
@@ -217,23 +273,52 @@ export const Media: CollectionConfig = {
         }
         if (
           (operation === "create" || operation === "update") &&
-          !req.context.restoreArchive &&
           req.file &&
-          /^image\/(jpeg|png|webp)$/.test(req.file.mimetype)
+          /^video\/(mp4|quicktime|3gpp)$/.test(req.file.mimetype)
+        ) {
+          const data = repairTrailingMediaData(req.file.data);
+          if (data !== req.file.data) req.file = { ...req.file, data };
+        }
+        if (req.file?.mimetype === "image/gif") {
+          try {
+            const metadata = await sharp(req.file.data, {
+              animated: true,
+            }).metadata();
+            if (
+              !metadata.width ||
+              !metadata.height ||
+              metadata.width * metadata.height > 80_000_000
+            )
+              throw new Error("image too large");
+          } catch {
+            throw new APIError(
+              "GIF 图片无法处理或尺寸过大，请重新导出后上传。",
+              400,
+            );
+          }
+        }
+        if (
+          (operation === "create" || operation === "update") &&
+          (!req.context.restoreArchive ||
+            req.context.restoreOriginal === true) &&
+          req.file &&
+          /^image\/(jpeg|png|webp|avif|heic|heif|heic-sequence|heif-sequence)$/.test(
+            req.file.mimetype,
+          )
         ) {
           const originalSize = req.file.size;
           try {
             const isDocument = req.data?.imageKind === "document";
-            const buffer = await sharp(req.file.data, {
-              limitInputPixels: 80000000,
-            })
-              .rotate()
-              .resize(isDocument ? 4096 : 2048, isDocument ? 4096 : 2048, {
-                fit: "inside",
-                withoutEnlargement: true,
-              })
-              .webp({ quality: isDocument ? 92 : 82 })
-              .toBuffer();
+            const buffer = /^image\/hei[cf]/.test(req.file.mimetype)
+              ? await convertHeic(req.file.data, isDocument)
+              : await sharp(req.file.data, { limitInputPixels: 80000000 })
+                  .rotate()
+                  .resize(isDocument ? 4096 : 2048, isDocument ? 4096 : 2048, {
+                    fit: "inside",
+                    withoutEnlargement: true,
+                  })
+                  .webp({ quality: isDocument ? 92 : 82 })
+                  .toBuffer();
             req.file = {
               ...req.file,
               data: buffer,
@@ -244,14 +329,15 @@ export const Media: CollectionConfig = {
             if (req.data)
               req.data.originalSize =
                 Number(req.data.originalSize) || originalSize;
-          } catch {
+          } catch (error) {
+            if (error instanceof APIError) throw error;
             throw new APIError(
-              "这张图片暂时无法处理，请换一张 JPEG、PNG 或 WebP 图片。",
+              "这张图片暂时无法处理，请重新导出后再上传。",
               400,
             );
           }
         }
-        return args;
+        return operationArgs;
       },
     ],
     beforeChange: [

@@ -3,7 +3,12 @@ import { useState } from "react";
 import { ImagePlus, Images, X } from "lucide-react";
 import type { Media } from "@mylife/shared";
 import { api } from "@/lib/api";
-import { prepareImage, uploadMedia } from "@/lib/media";
+import {
+  IMAGE_ACCEPT,
+  mediaFileType,
+  prepareImage,
+  uploadMedia,
+} from "@/lib/media";
 import { mediaUrl } from "@/lib/urls";
 import { useSession } from "./session";
 
@@ -55,10 +60,16 @@ export function MediaPicker({
     setError("");
     setProgress(0);
     try {
-      if (!/^image\/(jpeg|png|webp)$/.test(file.type))
-        throw Error("请选择 JPEG、PNG 或 WebP 图片。");
-      if (file.size > 100 * 1024 * 1024)
-        throw Error("图片超过 100 MB，请选择小一点的文件。");
+      if (!mediaFileType(file).startsWith("image/"))
+        throw Error("请选择常见的图片文件。");
+      const capabilities = await api<{ maxUploadMB: number }>(
+        "/capabilities",
+      ).catch(() => null);
+      if (
+        capabilities?.maxUploadMB &&
+        file.size > capabilities.maxUploadMB * 1024 * 1024
+      )
+        throw Error(`图片超过 ${capabilities.maxUploadMB} MB，请选择小一点的文件。`);
       const image = await prepareImage(file, false);
       const m = await uploadMedia(image, file.size, "photo", setProgress);
       onChange(m);
@@ -78,7 +89,7 @@ export function MediaPicker({
           {busy ? `处理中 ${progress}%` : "上传照片"}
           <input
             type="file"
-            accept="image/jpeg,image/png,image/webp"
+            accept={IMAGE_ACCEPT}
             hidden
             disabled={busy}
             onChange={(e) => {

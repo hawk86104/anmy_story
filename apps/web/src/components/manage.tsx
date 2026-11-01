@@ -31,7 +31,13 @@ import { ENTRY_LIST_SORT, displayDate } from "@mylife/shared";
 import { markdownEntryTitle as entryTitle } from "@/lib/markdown-text";
 import { api, sizeLabel } from "@/lib/api";
 import { apiUrl, mediaUrl } from "@/lib/urls";
-import { prepareImage, uploadMedia } from "@/lib/media";
+import {
+  IMAGE_ACCEPT,
+  VIDEO_ACCEPT,
+  OTHER_MEDIA_ACCEPT,
+  prepareImage,
+  uploadMedia,
+} from "@/lib/media";
 import { useSession } from "./session";
 import { draftKey, removeDraft } from "@/lib/drafts";
 import { EntryArtwork } from "./entry-card";
@@ -516,7 +522,10 @@ export function ManageRecord({ id }: { id: string }) {
         ) : (
           <section className="settings-panel">
             <h2>最初的表达，仍然在这里。</h2>
-            <MarkdownContent className="version-comparison" content={entry.originalText || "这段记录最初以素材开始。"} />
+            <MarkdownContent
+              className="version-comparison"
+              content={entry.originalText || "这段记录最初以素材开始。"}
+            />
             <h2>一路写来的样子</h2>
             {history.map((v) => (
               <details className="history-item" key={v.id}>
@@ -524,7 +533,10 @@ export function ManageRecord({ id }: { id: string }) {
                   版本 {v.revision} · {v.editorName}{" "}
                   <small>{new Date(v.createdAt).toLocaleString("zh-CN")}</small>
                 </summary>
-                <MarkdownContent className="version-comparison" content={v.snapshot.content || "这一版记录以素材开始。"} />
+                <MarkdownContent
+                  className="version-comparison"
+                  content={v.snapshot.content || "这一版记录以素材开始。"}
+                />
                 <button
                   className="text-button"
                   onClick={async () => {
@@ -681,7 +693,7 @@ export function ManageMedia() {
           hidden
           disabled={uploading}
           type="file"
-          accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime,audio/*,application/pdf"
+          accept={`${IMAGE_ACCEPT},${VIDEO_ACCEPT},${OTHER_MEDIA_ACCEPT}`}
           onChange={(e) => {
             void upload(e.target.files?.[0]);
             e.target.value = "";

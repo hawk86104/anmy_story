@@ -49,7 +49,14 @@ import {
   type OfflineDraft,
 } from "@/lib/offline-draft";
 import { mediaUrl } from "@/lib/urls";
-import { prepareImage, uploadMedia } from "@/lib/media";
+import {
+  IMAGE_ACCEPT,
+  VIDEO_ACCEPT,
+  OTHER_MEDIA_ACCEPT,
+  mediaFileType,
+  prepareImage,
+  uploadMedia,
+} from "@/lib/media";
 import { AttachmentLibrary } from "./media-picker";
 import { AIAssistant } from "./ai-assistant";
 import { MarkdownEditor } from "./markdown-editor";
@@ -102,7 +109,12 @@ const initial = (entry?: Entry): EntryInput => ({
       ? entry.mainProject
       : entry?.mainProject?.id || null,
   status: "saved",
-  visibility: entry?.visibility || "family",
+  visibility:
+    entry?.status === "draft" &&
+    entry.publicRequested &&
+    entry.reviewStatus === "none"
+      ? "public"
+      : entry?.visibility || "public",
   revision: entry?.revision,
   clientId: crypto.randomUUID(),
 });
@@ -205,7 +217,11 @@ export function EntryEditor({
         (n) => update({ progress: n }),
         recordCreatedAt.current,
       );
-      update({ status: "ready", progress: 100, media });
+      if (item.preview) {
+        URL.revokeObjectURL(item.preview);
+        objectUrls.current.delete(item.preview);
+      }
+      update({ status: "ready", progress: 100, media, preview: undefined });
     } catch (e) {
       update({
         status: "failed",
@@ -486,17 +502,14 @@ export function EntryEditor({
         setError(`${file.name} 超过 ${maxMB} MB，请选择小一点的文件。`);
         continue;
       }
-      if (
-        !/^(image\/(jpeg|png|webp)|video\/(mp4|quicktime|webm)|audio\/(mpeg|mp4|x-m4a|wav|webm|ogg)|application\/pdf)$/.test(
-          file.type,
-        )
-      ) {
+      const type = mediaFileType(file);
+      if (!type) {
         setError(
-          `${file.name} 暂不支持。图片请使用 JPEG、PNG 或 WebP；也支持常见视频、音频和 PDF。`,
+          `${file.name} 暂不支持。请选择常见图片、视频、音频或 PDF 文件。`,
         );
         continue;
       }
-      const preview = file.type.startsWith("image/")
+      const preview = /^image\/(jpeg|png|webp|gif|avif)$/.test(type)
         ? URL.createObjectURL(file)
         : undefined;
       if (preview) objectUrls.current.add(preview);
@@ -1336,7 +1349,7 @@ export function EntryEditor({
               <small>
                 {form.visibility === "family"
                   ? "只有你和家长可以查看"
-                  : "保存后直接公开，游客也能查看"}
+                  : "发表后所有人可见；草稿仅自己和家长可见"}
               </small>
             </div>
             <div className="submit-buttons">
@@ -1390,9 +1403,9 @@ export function EntryEditor({
             <div>
               <strong>这是你安心记录的地方</strong>
               <p>
-                记录默认只对你和家长可见。
+                新记录默认公开，游客也能查看。
                 <br />
-                保存以后，也能随时修改。
+                可以选择仅自己和家长可见。
               </p>
             </div>
           </div>
@@ -1406,7 +1419,7 @@ export function EntryEditor({
         hidden
         ref={inputPhoto}
         type="file"
-        accept="image/jpeg,image/png,image/webp"
+        accept={IMAGE_ACCEPT}
         multiple
         onChange={(e) => {
           addFiles(e.target.files);
@@ -1428,7 +1441,7 @@ export function EntryEditor({
         hidden
         ref={inputVideo}
         type="file"
-        accept="video/mp4,video/quicktime,video/webm"
+        accept={VIDEO_ACCEPT}
         multiple
         onChange={(e) => {
           addFiles(e.target.files);
@@ -1439,7 +1452,7 @@ export function EntryEditor({
         hidden
         ref={inputFile}
         type="file"
-        accept="application/pdf,audio/*"
+        accept={OTHER_MEDIA_ACCEPT}
         multiple
         onChange={(e) => {
           addFiles(e.target.files);
@@ -1590,7 +1603,7 @@ export function EntryEditor({
                       value: "public",
                       title: "所有人可见",
                       description:
-                        "保存后直接公开，所有人（包括未登录的游客）都能查看",
+                        "发表后所有人（包括未登录的游客）都能查看，草稿仍保持私密",
                       Icon: Globe2,
                     },
                   ] as const

@@ -206,7 +206,12 @@ export const Entries: CollectionConfig = {
         const wantsPublic =
           intent.visibility !== undefined
             ? intent.visibility === "public"
-            : originalDoc?.visibility === "public";
+            : originalDoc?.visibility !== undefined
+              ? originalDoc.status === "draft"
+                ? originalDoc.publicRequested === true &&
+                  originalDoc.reviewStatus === "none"
+                : originalDoc.visibility === "public"
+              : true;
         const publication = resolvePublication({
           requestedVisibility: wantsPublic ? "public" : "family",
           status: merged.status,
@@ -390,6 +395,10 @@ export const Entries: CollectionConfig = {
       label: "可见范围",
       type: "select",
       defaultValue: "family",
+      admin: {
+        description: "新记录发表默认公开；草稿仍仅自己和家长可见。",
+        components: { beforeInput: ["./components/DefaultEntryVisibility"] },
+      },
       required: true,
       options: [
         { label: "仅自己和家长可见", value: "family" },

@@ -9,6 +9,7 @@ import { closePayload } from "../lib/shutdown";
 import { cleanupBackupTemps } from "../lib/backup-management";
 
 const once = process.argv.includes("--once");
+const drain = process.argv.includes("--drain");
 // Schema changes belong to the development preflight or production migrations.
 Object.assign(process.env, { MYLIFE_MEDIA_WORKER: "true" });
 const { default: config } = await import("../payload.config");
@@ -73,7 +74,9 @@ process.on("SIGTERM", () => {
 process.on("SIGINT", () => {
   running = false;
 });
-const workerContext = { mediaWorker: true };
+// Payload's storage plugin stores file data in request context. Each operation
+// needs its own context so a prior upload cannot be reused for the next job.
+const workerContext = () => ({ mediaWorker: true });
 try {
   payload = await getPayload({ config });
   // After a process restart, protected originals make interrupted jobs safe to retry.
@@ -88,7 +91,7 @@ try {
       collection: "media",
       id: doc.id,
       data: { processingStatus: "queued" },
-      context: workerContext,
+      context: workerContext(),
     });
   console.log("MyLife 媒体处理已启动。");
   while (running) {
@@ -106,7 +109,7 @@ try {
     });
     const doc = batch.docs[0];
     if (!doc) {
-      if (once) break;
+      if (once || drain) break;
       await new Promise((r) => setTimeout(r, 2500));
       continue;
     }
@@ -116,7 +119,7 @@ try {
         collection: "media",
         id: doc.id,
         data: { processingStatus: "processing", processingError: null },
-        context: workerContext,
+        context: workerContext(),
       });
       await mkdir(tempDir, { recursive: true });
       const input = path.join(
@@ -142,14 +145,21 @@ try {
           30000,
         ),
       );
-      if (
-        !probe.streams?.some(
-          (s: { codec_type: string }) => s.codec_type === "video",
-        )
-      )
-        throw new Error("文件中没有可播放的视频画面。");
+      const hasVideo = probe.streams?.some(
+        (s: { codec_type: string; disposition?: { attached_pic?: number } }) =>
+          s.codec_type === "video" && !s.disposition?.attached_pic,
+      );
+      const hasAudio = probe.streams?.some(
+        (s: { codec_type: string }) => s.codec_type === "audio",
+      );
+      if (!hasVideo && !hasAudio)
+        throw new Error("文件中没有可播放的视频或音频。");
+      const audioOnly = !hasVideo;
       await mkdir(tempDir, { recursive: true });
-      const output = path.join(tempDir, "optimized.mp4");
+      const output = path.join(
+        tempDir,
+        audioOnly ? "optimized.m4a" : "optimized.mp4",
+      );
       await command(
         process.env.FFMPEG_PATH || "ffmpeg",
         [
@@ -157,22 +167,26 @@ try {
           "-y",
           "-i",
           input,
-          "-map",
-          "0:v:0",
-          "-map",
-          "0:a:0?",
-          "-vf",
-          "scale=w='min(1280,iw)':h='min(720,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2",
-          "-c:v",
-          "libx264",
-          "-preset",
-          "veryfast",
-          "-crf",
-          "26",
-          "-pix_fmt",
-          "yuv420p",
-          "-threads",
-          "2",
+          ...(audioOnly
+            ? ["-map", "0:a:0", "-vn"]
+            : [
+                "-map",
+                "0:V:0",
+                "-map",
+                "0:a:0?",
+                "-vf",
+                "scale=w='min(1280,iw)':h='min(720,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2",
+                "-c:v",
+                "libx264",
+                "-preset",
+                "veryfast",
+                "-crf",
+                "26",
+                "-pix_fmt",
+                "yuv420p",
+                "-threads",
+                "2",
+              ]),
           "-c:a",
           "aac",
           "-b:a",
@@ -202,10 +216,15 @@ try {
       );
       if (
         !verified.streams?.some(
-          (s: { codec_type: string }) => s.codec_type === "video",
-        )
+          (s: { codec_type: string }) =>
+            s.codec_type === (audioOnly ? "audio" : "video"),
+        ) ||
+        (hasAudio &&
+          !verified.streams?.some(
+            (s: { codec_type: string }) => s.codec_type === "audio",
+          ))
       )
-        throw new Error("视频校验未通过，已保留原件。");
+        throw new Error("媒体校验未通过，已保留原件。");
       const inputDuration = Number(probe.format?.duration),
         outputDuration = Number(verified.format?.duration);
       if (
@@ -213,7 +232,7 @@ try {
         (!outputDuration ||
           outputDuration < inputDuration - Math.max(0.5, inputDuration * 0.01))
       )
-        throw new Error("视频时长校验未通过，已保留原件，请稍后重试。");
+        throw new Error("媒体时长校验未通过，已保留原件，请稍后重试。");
       const buffer = await readFile(output);
       await payload.update({
         collection: "media",
@@ -221,14 +240,14 @@ try {
         data: { processingStatus: "ready", processingError: null },
         file: {
           data: buffer,
-          name: `${path.parse(doc.filename || "video").name}-optimized.mp4`,
-          mimetype: "video/mp4",
+          name: `${path.parse(doc.filename || "video").name}-optimized.${audioOnly ? "m4a" : "mp4"}`,
+          mimetype: audioOnly ? "audio/mp4" : "video/mp4",
           size: buffer.length,
         },
-        context: workerContext,
+        context: workerContext(),
       });
       await flushStorageDeletes(payload);
-      console.log(`素材 #${doc.id}：视频处理完成。`);
+      console.log(`素材 #${doc.id}：${audioOnly ? "音频" : "视频"}处理完成。`);
     } catch (error) {
       await payload.update({
         collection: "media",
@@ -240,7 +259,7 @@ try {
               ? error.message
               : "视频处理失败，可稍后重试。",
         },
-        context: workerContext,
+        context: workerContext(),
       });
       console.log(`素材 #${doc.id}：处理失败，原件已保留。`);
     } finally {

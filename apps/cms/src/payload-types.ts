@@ -190,6 +190,9 @@ export interface Entry {
   coverMedia?: (number | null) | Media;
   projects?: (number | Project)[] | null;
   mainProject?: (number | null) | Project;
+  /**
+   * 新记录发表默认公开；草稿仍仅自己和家长可见。
+   */
   visibility: 'family' | 'public';
   publicRequested?: boolean | null;
   reviewStatus?: ('none' | 'pending' | 'approved' | 'rejected') | null;

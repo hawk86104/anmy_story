@@ -8,7 +8,8 @@ import { randomUUID, randomBytes } from "node:crypto";
 import { promisify } from "node:util";
 import { execFile } from "node:child_process";
 import sharp from "sharp";
-import { createLocalReq, type Payload } from "payload";
+import { createLocalReq, handleEndpoints, type Payload } from "payload";
+import { sql, type SQLiteAdapter } from "@payloadcms/db-sqlite";
 import type { PublicEntry } from "@mylife/shared";
 import type { Entry as PayloadEntry } from "../payload-types";
 import { closePayload } from "../lib/shutdown";
@@ -42,12 +43,13 @@ test(
       },
       ...bootstrap,
     });
+    const childPassword = randomBytes(20).toString("hex");
     const child = await payload.create({
       collection: "users",
       data: {
         name: "孩子",
         email: "child@example.invalid",
-        password: randomBytes(20).toString("hex"),
+        password: childPassword,
         role: "child",
         familyId: family,
       },
@@ -98,7 +100,7 @@ test(
     let entry: PayloadEntry;
     try {
       await t.test(
-        "孩子提交立即保存，默认家庭可见，并保留原始表达",
+        "孩子可选择仅家庭可见，并保留原始表达",
         async () => {
           entry = await payload.create({
             collection: "entries",
@@ -121,6 +123,88 @@ test(
             child.id,
           );
           assert.equal(entry.publicSnapshot, null);
+        },
+      );
+      await t.test(
+        "新发表默认公开，草稿保留发表选择，已有私密记录保持私密",
+        async () => {
+          const { visibility: _visibility, ...rawWithoutVisibility } = base();
+          // Exercise a client that omits the field even though generated types require it.
+          const withoutVisibility = rawWithoutVisibility as ReturnType<
+            typeof base
+          >;
+          const published = await payload.create({
+            collection: "entries",
+            data: withoutVisibility,
+            user: child,
+            overrideAccess: false,
+          });
+          assert.equal(published.visibility, "public");
+          assert.equal((await publicDetail(published.id)).status, 200);
+
+          const draft = await payload.create({
+            collection: "entries",
+            data: {
+              ...withoutVisibility,
+              clientId: randomUUID(),
+              status: "draft",
+            },
+            user: child,
+            overrideAccess: false,
+          });
+          assert.equal(draft.visibility, "family");
+          assert.equal(draft.publicRequested, true);
+          assert.equal((await publicDetail(draft.id)).status, 404);
+          const fromDraft = await payload.update({
+            collection: "entries",
+            id: draft.id,
+            data: { status: "saved" },
+            user: child,
+            overrideAccess: false,
+          });
+          assert.equal(fromDraft.visibility, "public");
+          assert.equal((await publicDetail(fromDraft.id)).status, 200);
+
+          const privateDraft = await payload.create({
+            collection: "entries",
+            data: { ...base(), status: "draft", visibility: "family" },
+            user: child,
+            overrideAccess: false,
+          });
+          assert.equal(privateDraft.publicRequested, false);
+          const privatePublished = await payload.update({
+            collection: "entries",
+            id: privateDraft.id,
+            data: { status: "saved" },
+            user: child,
+            overrideAccess: false,
+          });
+          assert.equal(privatePublished.visibility, "family");
+          assert.equal((await publicDetail(privatePublished.id)).status, 404);
+
+          const legacy = await payload.create({
+            collection: "entries",
+            data: { ...base(), status: "draft", visibility: "family" },
+            user: child,
+            overrideAccess: false,
+          });
+          await (payload.db as unknown as SQLiteAdapter).drizzle.run(
+            sql`UPDATE entries SET public_requested = 1, review_status = 'pending' WHERE id = ${legacy.id}`,
+          );
+          const legacyPublished = await payload.update({
+            collection: "entries",
+            id: legacy.id,
+            data: { status: "saved" },
+            user: child,
+            overrideAccess: false,
+          });
+          assert.equal(legacyPublished.visibility, "family");
+          assert.equal((await publicDetail(legacyPublished.id)).status, 404);
+          assert.equal(
+            (await payload.findByID({ collection: "entries", id: entry.id }))
+              .visibility,
+            "family",
+          );
         },
       );
       await t.test("未登录与其他家庭不能读取记录、修改记录或版本", async () => {
@@ -825,6 +909,152 @@ test(
           assert.ok(probe.streams[0].height <= 720);
           assert.equal(probe.streams[0].codec_name, "h264");
           await assert.rejects(access(localMediaPath(mediaKey(media))));
+        },
+      );
+      await t.test(
+        "容器尾部长度不规范的视频可通过真实上传接口处理，并保留原始字节",
+        async () => {
+          const run = promisify(execFile);
+          const input = path.join(temp, "faststart.mp4");
+          await run(process.env.FFMPEG_PATH || "ffmpeg", [
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=320x240:rate=24",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=440:sample_rate=44100",
+            "-t",
+            "1",
+            "-c:v",
+            "libx264",
+            "-threads",
+            "1",
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            "-movflags",
+            "+faststart",
+            input,
+          ]);
+          const source = await readFile(input);
+          let offset = 0;
+          while (source.toString("latin1", offset + 4, offset + 8) !== "mdat") {
+            const size = source.readUInt32BE(offset);
+            assert.ok(size >= 8 && offset + size < source.length);
+            offset += size;
+          }
+          const declaredSize = source.readUInt32BE(offset);
+          assert.ok(declaredSize > 169 + 8);
+          assert.equal(offset + declaredSize, source.length);
+          const malformed = Buffer.from(source);
+          malformed.writeUInt32BE(declaredSize - 169, offset);
+
+          await payload.create({
+            collection: "family-services",
+            data: { familyId: family, preserveOriginals: true },
+            user: parent,
+            overrideAccess: false,
+          });
+          const { token } = await payload.login({
+            collection: "users",
+            data: { email: child.email, password: childPassword },
+          });
+          assert.ok(token);
+          const upload = async (bytes: Buffer) => {
+            const body = new FormData();
+            body.append(
+              "_payload",
+              JSON.stringify({
+                alt: "video.mp4",
+                originalSize: bytes.length,
+                imageKind: "photo",
+                recordCreatedAt: "2026-11-01T06:59:12.562Z",
+              }),
+            );
+            body.append(
+              "file",
+              new Blob([new Uint8Array(bytes)], { type: "video/mp4" }),
+              "video.mp4",
+            );
+            return handleEndpoints({
+              config,
+              request: new Request("http://localhost:3001/api/media", {
+                method: "POST",
+                headers: { Authorization: `JWT ${token}` },
+                body,
+              }),
+            });
+          };
+          const response = await upload(malformed);
+          assert.equal(response.status, 201, await response.clone().text());
+          const result = await response.json();
+          const media = await payload.findByID({
+            collection: "media",
+            id: result.doc.id,
+            overrideAccess: true,
+          });
+          assert.equal(media.processingStatus, "queued");
+          assert.equal(media.originalSize, malformed.length);
+          assert.deepEqual(
+            await readFile(localMediaPath(mediaKey(media))),
+            source,
+          );
+          const { originalLocation } = await import("../lib/storage");
+          assert.deepEqual(
+            await readFile(originalLocation(media).local),
+            malformed,
+          );
+
+          const invalid = await upload(source.subarray(0, 40));
+          assert.equal(invalid.status, 400);
+          const error = await invalid.json();
+          assert.match(
+            error.errors[0].data.errors[0].message,
+            /Invalid or corrupted/,
+          );
+
+          await run(
+            process.execPath,
+            ["--import", "tsx", "src/scripts/media-worker.ts", "--once"],
+            { cwd: process.cwd(), env: process.env, timeout: 60000 },
+          );
+          const processed = await payload.findByID({
+            collection: "media",
+            id: media.id,
+          });
+          assert.equal(processed.processingStatus, "ready");
+          const probe = JSON.parse(
+            (
+              await run(process.env.FFPROBE_PATH || "ffprobe", [
+                "-v",
+                "error",
+                "-show_streams",
+                "-show_format",
+                "-of",
+                "json",
+                localMediaPath(mediaKey(processed)),
+              ])
+            ).stdout,
+          );
+          assert.ok(
+            probe.streams.some(
+              (s: { codec_type: string }) => s.codec_type === "video",
+            ),
+          );
+          assert.ok(
+            probe.streams.some(
+              (s: { codec_type: string }) => s.codec_type === "audio",
+            ),
+          );
+          assert.ok(Number(probe.format.duration) >= 0.99);
+          assert.deepEqual(
+            await readFile(originalLocation(processed).local),
+            malformed,
+          );
         },
       );
     } finally {

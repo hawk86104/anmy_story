@@ -361,7 +361,13 @@ export async function restoreFamilyArchive(
         mainProject: projectMap.get(relationId(e.mainProject)) || null,
         status: ["draft", "archived"].includes(e.status) ? e.status : "saved",
         visibility:
-          options.full && e.visibility === "public" ? "public" : "family",
+          options.full &&
+          (e.visibility === "public" ||
+            (e.status === "draft" &&
+              e.publicRequested === true &&
+              e.reviewStatus === "none"))
+            ? "public"
+            : "family",
         author: author(e.author),
         familyId: options.familyId,
         clientId,

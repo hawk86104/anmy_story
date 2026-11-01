@@ -49,7 +49,9 @@ export function resolvePublication(input: {
     return {
       visibility: "family",
       reviewStatus: "none",
-      publicRequested: false,
+      // A draft is private, but remembers the visibility selected for publishing.
+      publicRequested:
+        input.status === "draft" && input.requestedVisibility === "public",
     };
   return {
     visibility: "public",

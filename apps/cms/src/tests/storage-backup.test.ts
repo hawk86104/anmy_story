@@ -521,39 +521,101 @@ test(
         },
       );
       await t.test("大鼠主题随完整备份导出并在整体还原后保留", async () => {
-        const existing = (await payload.find({
-          collection: "spaces",
-          where: { familyId: { equals: family } },
-          depth: 0,
-          overrideAccess: true,
-        })).docs[0];
+        const existing = (
+          await payload.find({
+            collection: "spaces",
+            where: { familyId: { equals: family } },
+            depth: 0,
+            overrideAccess: true,
+          })
+        ).docs[0];
         await payload.update({
-          collection: "spaces", id: existing.id,
-          data: { theme: "dashu" }, user: parent, overrideAccess: false,
+          collection: "spaces",
+          id: existing.id,
+          data: { theme: "dashu" },
+          user: parent,
+          overrideAccess: false,
         });
         const { dataset, files } = await createFamilyArchive(
           await createLocalReq({ user: parent }, payload),
         );
         assert.equal(dataset.profile?.theme, "dashu");
-        const dashuZip = new Uint8Array(await new Response(zipArchive(files)).arrayBuffer());
+        const dashuZip = new Uint8Array(
+          await new Response(zipArchive(files)).arrayBuffer(),
+        );
         await payload.update({
-          collection: "spaces", id: existing.id,
-          data: { theme: "usagi" }, user: parent, overrideAccess: false,
+          collection: "spaces",
+          id: existing.id,
+          data: { theme: "usagi" },
+          user: parent,
+          overrideAccess: false,
         });
         const preview = await (
           await call("/family/restore/preview", parent, undefined, dashuZip)
         ).json();
         await call("/family/restore/apply", parent, {
-          token: preview.token, confirmation: "还原整体备份",
+          token: preview.token,
+          confirmation: "还原整体备份",
         });
-        const restored = (await payload.find({
-          collection: "spaces", where: { familyId: { equals: family } },
-          depth: 0, overrideAccess: true,
-        })).docs[0];
+        const restored = (
+          await payload.find({
+            collection: "spaces",
+            where: { familyId: { equals: family } },
+            depth: 0,
+            overrideAccess: true,
+          })
+        ).docs[0];
         assert.equal(restored.theme, "dashu");
         assert.ok(restored.avatar);
         assert.ok(restored.cover);
       });
+      await t.test(
+        "完整备份还原保留草稿的发表可见范围，草稿本身仍私密",
+        async () => {
+          const draft = await payload.create({
+            collection: "entries",
+            user: child,
+            overrideAccess: false,
+            data: {
+              type: "quick",
+              content: "准备公开的草稿",
+              datePrecision: "unknown",
+              familyId: family,
+              author: child.id,
+              clientId: randomUUID(),
+              status: "draft",
+              visibility: "public",
+            },
+          });
+          assert.equal(draft.visibility, "family");
+          assert.equal(draft.publicRequested, true);
+          const { files } = await createFamilyArchive(
+            await createLocalReq({ user: parent }, payload),
+          );
+          const draftZip = new Uint8Array(
+            await new Response(zipArchive(files)).arrayBuffer(),
+          );
+          const preview = await (
+            await call("/family/restore/preview", parent, undefined, draftZip)
+          ).json();
+          await call("/family/restore/apply", parent, {
+            token: preview.token,
+            confirmation: "还原整体备份",
+          });
+          const restored = (
+            await payload.find({
+              collection: "entries",
+              where: { content: { equals: "准备公开的草稿" } },
+              depth: 0,
+              overrideAccess: true,
+            })
+          ).docs[0];
+          assert.equal(restored.status, "draft");
+          assert.equal(restored.visibility, "family");
+          assert.equal(restored.publicRequested, true);
+          assert.equal(restored.publicSnapshot, null);
+        },
+      );
       await t.test(
         "家长清空全部版本、项目与云端素材，保留账号、设置和其他家庭；清理失败可持久重试",
         async () => {
@@ -612,7 +674,9 @@ test(
             id: legacy.id,
             overrideAccess: true,
           });
-          const localFile = storage.localMediaPath(storage.mediaKey(legacyData));
+          const localFile = storage.localMediaPath(
+            storage.mediaKey(legacyData),
+          );
           const localOriginal = storage.originalLocation(legacyData).local;
           const originalBytes = await readFile(localOriginal);
           const storedBytes = await readFile(localFile);
@@ -635,8 +699,14 @@ test(
           });
           assert.equal(migrated.storage, "cos");
           assert.match(migrated._objectKey || "", /^[0-9a-f-]{36}$/);
-          assert.deepEqual(objects.get(storage.mediaKey(migrated)), storedBytes);
-          assert.deepEqual(objects.get(migrated.originalFilename!), originalBytes);
+          assert.deepEqual(
+            objects.get(storage.mediaKey(migrated)),
+            storedBytes,
+          );
+          assert.deepEqual(
+            objects.get(migrated.originalFilename!),
+            originalBytes,
+          );
           assert.deepEqual(objects.get(collisionKey), collisionBytes);
           await assert.rejects(access(localFile));
           await assert.rejects(access(localOriginal));
