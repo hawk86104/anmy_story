@@ -2533,10 +2533,11 @@ label select {
     position: static;
     flex-direction: column;
     align-items: stretch;
-    padding: 18px 0 5px;
-    background: var(--bg);
-    border-top: 1px solid #dde6d3;
-    gap: 16px;
+    padding: 12px 14px 14px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    gap: 10px;
   }
   .visibility-control > button {
     min-height: 36px;
@@ -2552,21 +2553,23 @@ label select {
     max-width: none;
     line-height: 1.5;
     margin-top: 2px;
+    color: var(--muted);
   }
   .submit-buttons {
+    justify-content: flex-end;
     gap: 8px;
   }
   .draft-button {
-    flex: 1;
+    flex: 0 0 auto;
     font-size: 13px;
-    padding: 10px 12px;
+    padding: 10px 14px;
     white-space: nowrap;
   }
   .editor-submit .primary-button {
-    flex: 2;
-    font-size: 11px;
+    flex: 0 0 auto;
+    font-size: 13px;
     min-height: 44px;
-    padding: 12px 15px;
+    padding: 10px 14px;
     gap: 7px;
     justify-content: center;
     white-space: nowrap;
@@ -3123,15 +3126,6 @@ label select {
   }
   .mode-hint {
     display: none;
-  }
-  .editor-submit .primary-button {
-    padding: 12px;
-  }
-  .draft-button {
-    font-size: 13px;
-  }
-  .submit-buttons {
-    gap: 5px;
   }
   .entry-title-input::placeholder {
     font-size: 16px;

@@ -2896,11 +2896,11 @@ input[type="checkbox"] {
   }
   .editor-submit .primary-button,
   .editor-submit .draft-button {
-    border-radius: 16px;
-    min-height: 48px;
+    border-radius: 12px;
+    min-height: 44px;
   }
   .editor-submit .primary-button {
-    font-size: 14px;
+    font-size: 13px;
   }
   .editor-aside .little-note {
     display: none;
