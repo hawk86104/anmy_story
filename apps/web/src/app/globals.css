@@ -2530,38 +2530,46 @@ label select {
     gap: 7px;
   }
   .editor-submit {
-    position: sticky;
-    bottom: calc(64px + env(safe-area-inset-bottom));
-    padding: 15px 0;
+    position: static;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 18px 0 5px;
     background: var(--bg);
-    z-index: 25;
     border-top: 1px solid #dde6d3;
-    gap: 10px;
+    gap: 16px;
   }
   .visibility-control > button {
-    font-size: 10px;
-    gap: 5px;
+    min-height: 36px;
+    font-size: 13px;
+    gap: 6px;
   }
   .visibility-control > button svg {
     width: 14px;
   }
   .visibility-control > small {
-    font-size: 7px;
-    max-width: 130px;
-    line-height: 1.9;
+    display: block;
+    font-size: 11px;
+    max-width: none;
+    line-height: 1.5;
+    margin-top: 2px;
   }
   .submit-buttons {
     gap: 8px;
   }
   .draft-button {
-    font-size: 10px;
-    padding: 10px 4px;
+    flex: 1;
+    font-size: 13px;
+    padding: 10px 12px;
+    white-space: nowrap;
   }
   .editor-submit .primary-button {
+    flex: 2;
     font-size: 11px;
     min-height: 44px;
     padding: 12px 15px;
     gap: 7px;
+    justify-content: center;
+    white-space: nowrap;
   }
   .editor-submit .primary-button svg:last-child {
     display: none;
@@ -3116,14 +3124,11 @@ label select {
   .mode-hint {
     display: none;
   }
-  .visibility-control > small {
-    display: none;
-  }
   .editor-submit .primary-button {
     padding: 12px;
   }
   .draft-button {
-    font-size: 9px;
+    font-size: 13px;
   }
   .submit-buttons {
     gap: 5px;
@@ -3184,7 +3189,7 @@ label select {
     font-size: 12px;
   }
   .visibility-control > button {
-    font-size: 11px;
+    font-size: 13px;
   }
   .entry-body-input::placeholder {
     font-size: 14px;
